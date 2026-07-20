@@ -1970,9 +1970,9 @@ window.ADRS = window.ADRS || {};
     }
   });
 
-  // Start on PR #73 if present (matches Option E's default focus PR for this demo data).
-  const initialIdx = TIMELINE.findIndex(p => p.pr === 73);
-  state.prIndex = initialIdx >= 0 ? initialIdx : 0;
+  // Start on the most recent PR in the bundle (timeline is chronological).
+  state.prIndex = Math.max(0, TIMELINE.length - 1);
+  document.title = `${REPO} — Codebase Odyssey`;
 
   renderAll();
 
