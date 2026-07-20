@@ -1,0 +1,9 @@
+{
+  "name": "prodyssey",
+  "version": "0.1.0",
+  "description": "Codebase Odyssey generator: turn merged PRs of any locally checked-out repo into four-level narrated stories with scene art, voice narration, and extracted architecture decision records. Output is a portable .odyssey/ bundle with a built-in viewer.",
+  "author": { "name": "bjornslib" },
+  "repository": "https://github.com/bjornslib/prodyssey",
+  "license": "MIT",
+  "keywords": ["claude-code", "storytelling", "architecture", "adr", "pr-review", "codebase-odyssey"]
+}
