@@ -1,0 +1,1990 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Codebase Odyssey — Option F: Merged Review</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/motion@12/dist/motion.min.js"></script>
+<style>
+  /* Option F merges Option D's flat-map content pipeline (day palette, JetBrains Mono,
+     teal accent) with Option E's tactical-review structural ideas (topbar queue nav,
+     rail teaser look, decision dock). See index.html comments below for where each
+     piece was ported from and how conflicts were resolved. */
+  :root{
+    --accent:#2f8f9d;
+    --accent-text: oklch(0.42 0.1 200);
+    --ink: oklch(0.24 0.02 250);
+    --ink-dim: oklch(0.5 0.02 250);
+    --ink-dimmer: oklch(0.48 0.02 250);
+    --line: rgba(30,40,55,0.12);
+    --line-soft: rgba(30,40,55,0.1);
+    --paper: #f6f4ef;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;background:var(--paper);}
+  body{
+    font-family:-apple-system,'Segoe UI',sans-serif;
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{ font-family:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace; }
+  a{color:oklch(0.5 0.13 200);}
+  a:hover{color:oklch(0.4 0.14 200);}
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:rgba(30,40,55,0.18);border-radius:5px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  button{font-family:inherit;}
+
+  #app{height:100vh;width:100%;display:flex;flex-direction:column;background:var(--paper);overflow:hidden;}
+
+  /* ================= TOPBAR (Option E's 3-zone layout, translated to day palette) =================
+     Grid, not flex: a 1fr/auto/1fr track truly centers the middle (PR nav) cluster in the row
+     regardless of how wide the brand block or the hints widget happen to be — flexbox's naive
+     `flex:1 1 auto; justify-content:center` on the middle item only centers it within whatever
+     space is left after the side items, which visually drifts off-center whenever those two
+     side blocks differ in width (as they do here: brand block vs. shortcut-hints widget). */
+  #topbar{
+    display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:20px;padding:12px 24px;
+    border-bottom:1px solid var(--line);background:#fff;
+  }
+  .tb-brand{flex:0 0 auto;justify-self:start;min-width:0;}
+  .tb-brand .brand-title{font:700 12.5px 'JetBrains Mono',monospace;letter-spacing:.14em;color:oklch(0.22 0.02 250);}
+  .tb-brand .brand-repo{font:10.5px 'JetBrains Mono',monospace;color:var(--ink-dim);letter-spacing:.02em;margin-top:2px;}
+
+  .tb-center{justify-self:center;min-width:0;display:flex;align-items:center;gap:12px;}
+  .tb-nav-btn{
+    width:26px;height:26px;border-radius:5px;border:1px solid var(--line);background:#fff;color:var(--ink);
+    font-size:14px;line-height:1;cursor:pointer;flex:0 0 auto;
+  }
+  .tb-nav-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent-text);}
+  .tb-nav-btn:disabled{opacity:.3;cursor:not-allowed;}
+  .tb-pr-label{font:12.5px 'JetBrains Mono',monospace;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46vw;}
+  .tb-pr-label b{color:var(--accent-text);}
+  .tb-queue-count{font:11px 'JetBrains Mono',monospace;color:var(--ink-dim);white-space:nowrap;}
+
+  .tb-right{flex:0 0 auto;justify-self:end;display:flex;align-items:center;gap:18px;}
+  #tb-hints{display:flex;align-items:center;gap:8px;}
+  .kbd-hints{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font:11px 'JetBrains Mono',monospace;color:var(--ink-dim);}
+  kbd{background:rgba(30,40,55,.06);border:1px solid rgba(30,40,55,.16);border-radius:3px;padding:1px 6px;margin-right:3px;}
+  .hints-collapse-btn{
+    flex:0 0 auto;width:20px;height:20px;border-radius:50%;border:1px solid var(--line);background:#fff;
+    color:var(--ink-dim);font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  }
+  .hints-collapse-btn:hover{border-color:var(--accent);color:var(--accent-text);}
+  .hints-chip{
+    font:10.5px 'JetBrains Mono',monospace;letter-spacing:.03em;color:var(--ink-dim);background:oklch(0.98 0.005 250);
+    border:1px solid var(--line);border-radius:12px;padding:4px 10px;cursor:pointer;white-space:nowrap;
+  }
+  .hints-chip:hover{border-color:var(--accent);color:var(--accent-text);}
+
+  /* Slim queue-dot strip under the topbar (spec: "compact... small dots... or under the
+     topbar"). Ported from D's #queue-strip but stripped of PR-number sub-labels. */
+  #queue-dots-row{
+    flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:8px 24px;border-bottom:1px solid var(--line-soft);
+    background:#fff;
+  }
+  #queue-dots-row .qd-label{font:9.5px 'JetBrains Mono',monospace;color:var(--ink-dim);letter-spacing:.1em;text-transform:uppercase;flex:0 0 auto;}
+  #queue-dots-track{position:relative;flex:1;height:14px;}
+  #queue-dots-track .qd-line{position:absolute;left:1%;right:1%;top:50%;height:1px;background:rgba(30,40,55,0.12);transform:translateY(-50%);}
+  /* .qd-dot is the hit-target/position anchor only — CSS transform:translate(-50%,-50%)
+     centers it on the track line. The scale pulse (renderQueueDots) animates the
+     .qd-dot-fill CHILD instead of the dot itself: Motion's animate() writes a raw
+     inline `transform` for whatever it animates, which would otherwise blow away this
+     translate(-50%,-50%) (Motion has no idea a CSS transform already lives here) and
+     leave the active dot permanently offset down-right by half its own size once the
+     pulse settles. Isolating the animated transform on a child with no positioning
+     transform of its own sidesteps that clash entirely. */
+  .qd-dot{position:absolute;top:50%;border-radius:50%;cursor:pointer;padding:0;background:none;border:none;transform:translate(-50%,-50%);}
+  .qd-dot-fill{display:block;width:100%;height:100%;border-radius:50%;}
+
+  /* ================= CONTENT ROW: left rail + content column ================= */
+  #content-row{flex:1 1 auto;min-height:0;display:flex;overflow:hidden;}
+
+  /* Left rail: D's leveling (vertical, numbered) with E's rail look (teaser lines,
+     active highlight), translated to day palette. */
+  #level-rail{
+    flex:0 0 224px;display:flex;flex-direction:column;gap:0;
+    background:#fff;border-right:1px solid var(--line);overflow-y:auto;
+  }
+  .rail-nav-title{font:10px 'JetBrains Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim);margin:14px 14px 2px;}
+  .rail-item{
+    padding:12px 14px;cursor:pointer;border-left:3px solid transparent;border-bottom:1px solid var(--line-soft);
+    transition:background-color 150ms ease,border-color 150ms ease,color 150ms ease;
+  }
+  .rail-item:hover{background:oklch(0.97 0.005 250);}
+  .rail-item.active{background:color-mix(in oklch, var(--accent) 7%, white);border-left-color:var(--accent);}
+  .rail-num{font:600 10px 'JetBrains Mono',monospace;color:var(--ink-dim);letter-spacing:.06em;}
+  .rail-item.active .rail-num{color:var(--accent-text);}
+  .rail-title{font:600 12.5px system-ui,sans-serif;color:oklch(0.25 0.02 250);margin-top:2px;}
+  .rail-item.active .rail-title{color:var(--accent-text);}
+  .rail-teaser{font-size:11px;color:var(--ink-dim);line-height:1.4;margin-top:4px;}
+
+  #content-col{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;min-height:0;}
+
+  /* Slim narration caption, sits atop the scrollable content (spec allows either side).
+     Heading + narration on the left, fixed-width audio control on the right — vertically
+     centered against the heading block. */
+  #narration-caption{
+    flex:0 0 auto;padding:12px 26px;border-bottom:1px solid var(--line-soft);background:#fff;
+    display:flex;align-items:center;justify-content:space-between;gap:20px;
+  }
+  .caption-text{min-width:0;flex:1 1 auto;}
+  .caption-text .pr-title-line{font:700 13px system-ui,sans-serif;color:oklch(0.22 0.02 250);margin-bottom:3px;}
+  .caption-text .narration-text{margin:0;font-size:13px;line-height:1.5;font-style:italic;color:var(--ink-dim);max-width:80ch;}
+
+  /* Narration-audio control (ported from D's .audio-card). Lives in the content-pane
+     header now, not the topbar. A fixed flex-basis means the row never reflows whether
+     the label reads "narration audio — Overview" or "narration audio (none for this
+     level)" — present-but-dimmed either way, never removed from layout. */
+  #tb-audio{
+    /* flex-item quirk: without an explicit min-width, a flex child's default
+       min-width:auto lets its content's min-content size (here, the long "none for
+       this level" label) win over flex-basis/flex-grow:0 and stretch the box wider —
+       min-width:0 here plus min-width:0+ellipsis on .audio-label is what actually
+       makes the fixed 280px hold regardless of label length. */
+    flex:0 0 280px;min-width:0;width:280px;display:flex;align-items:center;gap:9px;
+    background:oklch(0.98 0.005 250);border:1px solid var(--line);
+    border-radius:20px;padding:5px 12px 5px 5px;overflow:hidden;
+  }
+  #tb-audio.disabled{opacity:.45;}
+  #tb-audio .audio-btn{
+    flex:0 0 auto;width:22px;height:22px;border-radius:50%;border:1px solid rgba(30,40,55,0.2);
+    background:color-mix(in oklch, var(--accent) 10%, white);color:var(--accent-text);font-size:9px;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+  }
+  #tb-audio .audio-btn:disabled{cursor:not-allowed;}
+  #tb-audio .audio-progress{flex:0 0 64px;height:3px;background:rgba(30,40,55,0.12);border-radius:2px;overflow:hidden;}
+  #tb-audio .audio-fill{height:100%;width:0%;background:var(--accent);}
+  #tb-audio .audio-label{
+    flex:1 1 auto;min-width:0;font:10px 'JetBrains Mono',monospace;color:var(--ink-dim);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+
+  /* ---------- Main scrollable content + scroll-through cue ---------- */
+  #main-content-wrap{flex:1 1 auto;min-height:0;position:relative;}
+  /* Generous bottom whitespace (spec fix #1): reaching the scroll-through cue must take real
+     scrolling, even on levels whose authored content barely exceeds (or doesn't exceed) the
+     viewport — a short level should not land the pointer "at the bottom" with zero motion. */
+  #main-content{height:100%;overflow-y:auto;padding:22px 26px 28px;padding-block-end:40vh;}
+  .level-stack{display:flex;flex-direction:column;gap:16px;}
+  .level-stack.narrow{max-width:1040px;margin:0 auto;}
+  .level-stack.narrower{max-width:960px;margin:0 auto;}
+
+  .scroll-cue{
+    position:absolute;left:0;right:0;display:flex;align-items:center;justify-content:center;gap:8px;
+    font:600 11px 'JetBrains Mono',monospace;letter-spacing:.04em;color:var(--accent-text);
+    background:linear-gradient(to bottom, transparent, color-mix(in oklch, var(--accent) 12%, white) 40%, color-mix(in oklch, var(--accent) 18%, white));
+    padding:10px 0 8px;pointer-events:none;
+  }
+  .scroll-cue.bottom{bottom:0;}
+  .scroll-cue.top{top:0;background:linear-gradient(to top, transparent, color-mix(in oklch, var(--accent) 12%, white) 40%, color-mix(in oklch, var(--accent) 18%, white));}
+  .scroll-cue[hidden]{display:none;}
+
+  .hero-frame{border-radius:10px;overflow:hidden;border:1px solid var(--line);box-shadow:0 2px 10px rgba(30,40,55,0.06);}
+  .hero-frame img{display:block;width:100%;height:auto;}
+
+  .district-boxes{display:flex;flex-wrap:wrap;gap:10px;}
+  .district-box{
+    min-height:96px;padding:10px 12px;border-radius:8px;display:flex;flex-direction:column;
+    justify-content:flex-end;align-items:flex-start;text-align:left;cursor:pointer;font-family:inherit;
+    transition:background .4s ease,border-color .4s ease;border-width:1px;border-style:solid;
+  }
+  .district-box .db-label{font:600 12px system-ui,sans-serif;color:oklch(0.22 0.02 250);}
+  .district-box .db-files{font:10.5px 'JetBrains Mono',monospace;color:var(--ink-dim);margin-top:2px;}
+  .district-box.static{cursor:default;min-height:78px;}
+  .district-box .db-touch{font:10.5px 'JetBrains Mono',monospace;color:var(--ink-dim);margin-top:2px;}
+
+  .legend-row{display:flex;gap:16px;flex-wrap:wrap;font:10.5px 'JetBrains Mono',monospace;color:var(--ink-dim);}
+  .legend-item{display:flex;align-items:center;gap:6px;}
+  .legend-swatch{width:8px;height:8px;border-radius:2px;display:inline-block;}
+
+  .chip-row{display:flex;gap:12px;flex-wrap:wrap;}
+  .touch-chip{font:10.5px 'JetBrains Mono',monospace;padding:5px 10px;border-radius:12px;border:1px solid;}
+
+  /* ---------- Fixed-size evidence/problem/solution cards (spec: ~240px, internal
+     scroll). Ported from E's evidence/problem/solution card visuals, day palette. ---------- */
+  .grid-2x2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .fixed-card{
+    height:240px;border-radius:10px;border:1px solid var(--line);background:#fff;
+    padding:14px 16px;display:flex;flex-direction:column;min-height:0;
+  }
+  .fixed-card .fc-kicker{
+    flex:0 0 auto;font:700 10.5px 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;
+    margin-bottom:8px;display:flex;align-items:center;gap:6px;
+  }
+  .fixed-card .fc-body{flex:1 1 auto;min-height:0;overflow-y:auto;}
+  .fixed-card .fc-body p{margin:0 0 8px 0;font-size:13px;line-height:1.55;color:oklch(0.28 0.02 250);}
+  .fixed-card .fc-body p:last-child{margin-bottom:0;}
+  .fixed-card .fc-empty{font-size:12px;color:var(--ink-dim);font-style:italic;}
+
+  .fixed-card.evidence .fc-kicker{color:var(--accent-text);}
+  .fixed-card.problem{border-left:3px solid oklch(0.6 0.16 25);}
+  .fixed-card.problem .fc-kicker{color:oklch(0.5 0.15 25);}
+  .fixed-card.solution{border-left:3px solid oklch(0.55 0.15 145);}
+  .fixed-card.solution .fc-kicker{color:oklch(0.42 0.13 145);}
+
+  .alt-section-label{font:10.5px 'JetBrains Mono',monospace;letter-spacing:.1em;color:var(--ink-dim);text-transform:uppercase;margin-bottom:8px;}
+  .alt-row{display:flex;gap:12px;flex-wrap:wrap;}
+  .alt-card{width:240px;background:#fff;border:1px dashed oklch(0.6 0.13 25);border-radius:8px;padding:10px 12px;}
+  .alt-card .alt-opt{font-size:12px;font-weight:600;color:oklch(0.3 0.02 250);}
+  .alt-card .alt-rej{font-size:11px;color:oklch(0.45 0.14 25);margin-top:5px;line-height:1.4;}
+
+  .adr-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .adr-badge{
+    font:10.5px 'JetBrains Mono',monospace;padding:4px 10px;border-radius:3px;cursor:pointer;
+    border:1px solid oklch(0.55 0.12 60);color:oklch(0.45 0.12 60);background:oklch(0.97 0.02 60);
+  }
+  .adr-badge:hover{background:oklch(0.94 0.04 60);border-color:oklch(0.48 0.13 60);}
+  .no-adrs{font:11.5px system-ui,sans-serif;color:var(--ink-dim);}
+
+  .beats-stack{display:flex;flex-direction:column;gap:10px;}
+  .beat-card.fixed-card{height:180px;}
+  .beat-card .fc-kicker{color:oklch(0.5 0.02 250);}
+  .beat-card.intuition{background:color-mix(in oklch, var(--accent) 6%, white);border-color:color-mix(in oklch, var(--accent) 30%, transparent);}
+  .beat-card.intuition .fc-kicker{color:var(--accent-text);}
+
+  .focus-banner{display:flex;align-items:center;gap:10px;font:12px system-ui,sans-serif;color:var(--accent-text);background:color-mix(in oklch, var(--accent) 8%, white);border:1px solid color-mix(in oklch, var(--accent) 35%, transparent);border-radius:8px;padding:8px 14px;}
+  .focus-banner button{margin-left:auto;border:none;background:none;color:var(--accent-text);text-decoration:underline;cursor:pointer;font:12px system-ui,sans-serif;}
+
+  .file-group{border:1px solid rgba(30,40,55,0.14);border-left:3px solid oklch(0.5 0.14 200);border-radius:6px;background:#fff;overflow:hidden;}
+  .file-group.match{border-color:oklch(0.5 0.14 200);background:color-mix(in oklch, oklch(0.5 0.14 200) 5%, white);}
+  .file-group summary{padding:12px 16px;cursor:pointer;font:600 13px system-ui,sans-serif;color:oklch(0.25 0.02 250);}
+  .file-group .fg-note{padding:0 16px 12px;font-size:12px;color:oklch(0.48 0.02 250);line-height:1.5;}
+  .file-group .fg-files{margin:0;padding:0 16px 14px 16px;}
+  .file-row{display:flex;align-items:center;gap:10px;padding:4px 0;font:11px 'JetBrains Mono',monospace;color:oklch(0.4 0.1 155);}
+  .file-row .fr-name{flex:1 1 auto;min-width:0;overflow-wrap:anywhere;}
+  .fr-diffbtn{
+    flex:0 0 auto;font:10px 'JetBrains Mono',monospace;padding:3px 9px;border-radius:10px;cursor:pointer;
+    border:1px solid color-mix(in oklch, var(--accent) 50%, transparent);background:color-mix(in oklch, var(--accent) 8%, white);color:var(--accent-text);
+  }
+  .fr-nodiff{flex:0 0 auto;font:10.5px 'JetBrains Mono',monospace;color:var(--ink-dim);font-style:italic;}
+  .fr-diffbody{margin:4px 0 10px;border:1px solid var(--line);border-radius:6px;overflow:hidden;max-height:320px;overflow-y:auto;background:oklch(0.985 0.003 250);}
+  .fr-diffbody[hidden]{display:none;}
+  .diff-line{font:11.5px 'JetBrains Mono',monospace;white-space:pre;padding:1px 12px;}
+  .diff-add{background:oklch(0.94 0.05 145);color:oklch(0.38 0.12 145);}
+  .diff-del{background:oklch(0.95 0.06 25);color:oklch(0.45 0.15 25);}
+  .diff-hunk{color:var(--accent-text);opacity:.9;}
+  .diff-meta{color:var(--ink-dim);}
+  .diff-ctx{color:oklch(0.32 0.02 250);}
+
+  .empty-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px 20px;text-align:center;}
+  .empty-card .empty-detail{font-size:12.5px;color:oklch(0.45 0.02 250);}
+
+  /* ================= DECISION DOCK (E's structure, day palette) =================
+     Single row now: review-status pill on the left, [Comments (n)] [Close] [Merge ▾] on the
+     right. The comment compose UI and comment list live in the drawer (below) instead. */
+  #dock{flex:0 0 auto;border-top:1px solid var(--line);background:#fff;}
+  .dock-row1{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 24px;flex-wrap:wrap;}
+  .dock-row1-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .dock-tag-label{font:11px 'JetBrains Mono',monospace;color:var(--ink-dim);}
+  .tag-chip{
+    font:10px 'JetBrains Mono',monospace;padding:3px 9px;border-radius:10px;white-space:nowrap;
+    border:1px solid color-mix(in oklch, var(--accent) 50%, transparent);color:var(--accent-text);
+    background:color-mix(in oklch, var(--accent) 6%, white);
+  }
+  #comment-input{
+    width:100%;background:#fff;border:1px solid var(--line);color:var(--ink);
+    padding:9px 12px;border-radius:8px;font-size:12.5px;font-family:inherit;
+  }
+  #comment-input:focus{outline:2px solid color-mix(in oklch, var(--accent) 50%, transparent);border-color:var(--accent);}
+
+  .split-btn{display:flex;position:relative;flex:0 0 auto;}
+  .split-main{
+    font:600 12px system-ui,sans-serif;padding:9px 14px;border:1px solid oklch(0.5 0.15 145);
+    border-right:1px solid oklch(0.4 0.15 145);border-radius:6px 0 0 6px;
+    background:oklch(0.5 0.15 145);color:#fff;cursor:pointer;white-space:nowrap;
+  }
+  .split-main:hover{background:oklch(0.45 0.15 145);}
+  .split-main.is-merged{background:#8250df;border-color:#6b3fc0;}
+  .split-main.is-merged:hover{background:#7440c9;}
+  .split-arrow{
+    font:11px system-ui,sans-serif;padding:9px 10px;border:1px solid oklch(0.5 0.15 145);border-left:none;
+    border-radius:0 6px 6px 0;background:oklch(0.5 0.15 145);color:#fff;cursor:pointer;
+  }
+  .split-arrow:hover{background:oklch(0.45 0.15 145);}
+  .split-arrow.is-merged{background:#8250df;border-color:#6b3fc0;}
+  .merge-menu{
+    position:absolute;bottom:calc(100% + 6px);left:0;min-width:200px;background:#fff;
+    border:1px solid var(--line);border-radius:8px;box-shadow:0 -6px 20px rgba(30,40,55,0.16);
+    padding:6px;z-index:20;
+  }
+  .merge-menu[hidden]{display:none;}
+  .merge-menu-item{
+    display:block;width:100%;text-align:left;font:12px system-ui,sans-serif;padding:8px 10px;
+    border:none;background:none;border-radius:6px;cursor:pointer;color:var(--ink);
+  }
+  .merge-menu-item:hover{background:oklch(0.96 0.01 250);}
+
+  .decision-btn{
+    font:600 11.5px system-ui,sans-serif;padding:9px 16px;border-radius:6px;border:1px solid;
+    cursor:pointer;background:#fff;white-space:nowrap;flex:0 0 auto;
+  }
+  .decision-btn.close-pr{border-color:oklch(0.55 0.18 25);color:oklch(0.45 0.16 25);}
+  .decision-btn.close-pr.active,.decision-btn.close-pr:hover{background:oklch(0.95 0.06 25);}
+  .btn-add-comment{
+    font:600 11px system-ui,sans-serif;padding:9px 14px;border-radius:6px;flex:0 0 auto;
+    border:1px solid rgba(30,40,55,0.2);background:oklch(0.98 0.005 250);color:var(--ink);cursor:pointer;
+  }
+  .btn-add-comment:hover{border-color:var(--accent);color:var(--accent-text);}
+
+  .comment-list{display:flex;flex-direction:column;gap:5px;min-width:0;}
+  .comment-empty{font-size:11.5px;color:var(--ink-dim);font-style:italic;padding:6px 0;}
+  .comment-row{
+    display:flex;align-items:flex-start;gap:8px;font-size:12.5px;line-height:1.5;color:oklch(0.3 0.02 250);
+    background:oklch(0.98 0.005 250);border:1px solid var(--line);border-radius:6px;padding:6px 10px;
+  }
+  .comment-row .level-chip{
+    flex:0 0 auto;font:9.5px 'JetBrains Mono',monospace;letter-spacing:.04em;text-transform:uppercase;
+    padding:2px 7px;border-radius:10px;border:1px solid color-mix(in oklch, var(--accent) 50%, transparent);
+    color:var(--accent-text);background:color-mix(in oklch, var(--accent) 6%, white);
+  }
+  .comment-row .comment-text{flex:1;}
+  .comment-row .comment-del{flex:0 0 auto;border:none;background:none;color:oklch(0.55 0.13 25);cursor:pointer;font-size:12px;padding:0 2px;}
+
+  .decision-status{font:11px 'JetBrains Mono',monospace;padding:4px 10px;border-radius:12px;border:1px solid;white-space:nowrap;}
+  .btn-copy-md{
+    font:600 10.5px 'JetBrains Mono',monospace;letter-spacing:.04em;padding:5px 11px;border-radius:5px;
+    border:1px solid rgba(30,40,55,0.2);background:#fff;color:var(--ink-dimmer);cursor:pointer;white-space:nowrap;
+  }
+  .btn-copy-md.flash{background:oklch(0.94 0.05 150);border-color:oklch(0.55 0.14 150);color:oklch(0.4 0.13 150);}
+  .link-btn{background:none;border:none;color:var(--ink-dim);font:11px 'JetBrains Mono',monospace;text-decoration:underline;cursor:pointer;padding:0;white-space:nowrap;}
+  .link-btn:hover{color:oklch(0.45 0.16 25);}
+
+  /* ================= COMMENTS DRAWER (shadcn Sheet look, recreated in vanilla CSS) ================= */
+  #drawer-scrim{
+    position:fixed;inset:0;background:rgba(20,25,35,0.4);opacity:0;pointer-events:none;
+    transition:opacity .2s ease;z-index:40;
+  }
+  #drawer-scrim.open{opacity:1;pointer-events:auto;}
+  #comments-drawer{
+    position:fixed;top:0;right:0;bottom:0;width:420px;max-width:92vw;background:#fff;
+    border-left:1px solid var(--line);border-radius:14px 0 0 14px;box-shadow:-12px 0 34px rgba(20,25,35,0.2);
+    transform:translateX(100%);transition:transform .25s ease;z-index:41;
+    display:flex;flex-direction:column;min-height:0;
+  }
+  #comments-drawer.open{transform:translateX(0);}
+  .drawer-header{
+    flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+    padding:16px 20px;border-bottom:1px solid var(--line-soft);
+  }
+  .drawer-header h2{margin:0;font:700 14px system-ui,sans-serif;color:oklch(0.22 0.02 250);}
+  .drawer-close{
+    flex:0 0 auto;width:26px;height:26px;border-radius:6px;border:none;background:none;
+    font-size:16px;line-height:1;color:var(--ink-dim);cursor:pointer;
+  }
+  .drawer-close:hover{background:oklch(0.96 0.01 250);color:var(--ink);}
+  .drawer-body{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;padding:16px 20px;gap:14px;overflow:hidden;}
+  .drawer-compose{flex:0 0 auto;display:flex;flex-direction:column;gap:8px;}
+  .drawer-compose-row{display:flex;align-items:center;gap:8px;}
+  .drawer-list-label{font:10px 'JetBrains Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);}
+  .drawer-list{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px;}
+  .drawer-footer{
+    flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:12px 20px;border-top:1px solid var(--line-soft);
+  }
+
+  /* ================= ADR SHEET (same shadcn-Sheet family as the comments drawer,
+     just wider — reuses .drawer-header/.drawer-close/.drawer-body). Shares
+     #drawer-scrim with the comments drawer; JS enforces only one open at a time. ================= */
+  #adr-sheet{
+    position:fixed;top:0;right:0;bottom:0;width:clamp(480px, 40vw, 720px);max-width:92vw;background:#fff;
+    border-left:1px solid var(--line);border-radius:14px 0 0 14px;box-shadow:-12px 0 34px rgba(20,25,35,0.2);
+    transform:translateX(100%);transition:transform .25s ease;z-index:41;
+    display:flex;flex-direction:column;min-height:0;
+  }
+  #adr-sheet.open{transform:translateX(0);}
+  #adr-sheet .drawer-header{align-items:flex-start;}
+  .adr-sheet-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;}
+  .adr-state-badge{font:10px 'JetBrains Mono',monospace;letter-spacing:.04em;padding:3px 9px;border-radius:10px;border:1px solid;text-transform:uppercase;white-space:nowrap;}
+  .adr-sheet-sourceline{font:11px 'JetBrains Mono',monospace;color:var(--ink-dim);}
+  #adr-sheet .drawer-body{overflow-y:auto;gap:16px;}
+
+  .adr-block{border-radius:10px;border:1px solid var(--line);background:#fff;padding:14px 16px;}
+  .adr-block.problem{border-left:3px solid oklch(0.6 0.16 25);}
+  .adr-block.decision{border-left:3px solid oklch(0.55 0.15 145);}
+  .adr-block .ab-kicker{font:700 10.5px 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;}
+  .adr-block.problem .ab-kicker{color:oklch(0.5 0.15 25);}
+  .adr-block.decision .ab-kicker{color:oklch(0.42 0.13 145);}
+  .adr-block p{margin:0;font-size:13px;line-height:1.6;color:oklch(0.28 0.02 250);}
+
+  .force-chip{font:10.5px 'JetBrains Mono',monospace;padding:5px 10px;border-radius:12px;border:1px solid var(--line);color:var(--ink-dim);background:oklch(0.98 0.005 250);}
+
+  .adr-delivers-dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 12px;}
+  .adr-delivers-dl dt{font:600 10px 'JetBrains Mono',monospace;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-dim);white-space:nowrap;}
+  .adr-delivers-dl dd{margin:0;font-size:12.5px;line-height:1.5;color:oklch(0.3 0.02 250);}
+
+  /* Minimal markdown renderer output — headings/paragraphs/lists/quotes/code/tables. */
+  .adr-body-md{font-size:13px;line-height:1.65;color:oklch(0.28 0.02 250);}
+  .adr-body-md h2,.adr-body-md h3,.adr-body-md h4,.adr-body-md h5,.adr-body-md h6{
+    margin:18px 0 8px;font-family:system-ui,sans-serif;color:oklch(0.22 0.02 250);
+  }
+  .adr-body-md h2{font-size:15px;font-weight:700;}
+  .adr-body-md h3{font-size:14px;font-weight:700;}
+  .adr-body-md h4,.adr-body-md h5,.adr-body-md h6{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-dim);}
+  .adr-body-md p{margin:0 0 10px;}
+  .adr-body-md ul,.adr-body-md ol{margin:0 0 10px;padding-left:22px;}
+  .adr-body-md li{margin-bottom:4px;}
+  .adr-body-md blockquote{margin:0 0 10px;padding:6px 14px;border-left:3px solid color-mix(in oklch, var(--accent) 45%, transparent);background:color-mix(in oklch, var(--accent) 5%, white);color:var(--ink-dim);}
+  .adr-body-md blockquote p{margin:0;}
+  .adr-body-md code{font:12px 'JetBrains Mono',monospace;background:oklch(0.96 0.008 250);padding:1px 5px;border-radius:3px;}
+  .adr-body-md pre.md-code{background:oklch(0.16 0.01 250);color:oklch(0.92 0.005 250);border-radius:8px;padding:12px 14px;overflow-x:auto;margin:0 0 10px;}
+  .adr-body-md pre.md-code code{background:none;padding:0;color:inherit;}
+  .adr-body-md pre.md-table{background:oklch(0.98 0.005 250);border:1px solid var(--line);border-radius:6px;padding:10px 12px;overflow-x:auto;margin:0 0 10px;font-size:11.5px;}
+  .adr-body-md a{color:var(--accent-text);}
+
+  /* ================= AUDIO DIALOG (shadcn Dialog look, centered) =================
+     #audio-dialog-layer is a full-viewport flex centering box (pointer-events:none so
+     it never blocks clicks when empty) — the dialog is centered by flexbox, not by a
+     position:fixed + transform:translate(-50%,-50%) trick, precisely so Motion's scale
+     pulse (anim() writing a raw inline `transform`) has nothing pre-existing to clobber,
+     the same class of bug fixed on the queue dots above. */
+  #audio-dialog-layer{position:fixed;inset:0;z-index:42;display:flex;align-items:center;justify-content:center;pointer-events:none;}
+  #audio-dialog{
+    pointer-events:auto;width:min(1200px, 94vw);max-height:94vh;background:#fff;border:1px solid var(--line);border-radius:14px;
+    box-shadow:0 20px 60px rgba(20,25,35,0.28);padding:20px 22px 18px;display:flex;flex-direction:column;gap:14px;
+  }
+  #audio-dialog[hidden]{display:none;}
+  #drawer-scrim.audio-dim{background:rgba(20,25,35,0.5);backdrop-filter:blur(2px);}
+  .audio-dialog-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
+  .audio-dialog-title{font:700 14px system-ui,sans-serif;color:oklch(0.22 0.02 250);}
+  /* Body is either the generated level image (preferred) or, when no image asset exists
+     for this PR/level, a narration-text fallback — never both at once (see
+     renderAudioDialogContent). */
+  .audio-dialog-image{display:block;width:100%;max-height:78vh;object-fit:contain;border-radius:10px;border:1px solid var(--line);background:oklch(0.97 0.005 250);}
+  .audio-dialog-image[hidden]{display:none;}
+  .audio-dialog-narration{margin:0;font-size:13px;line-height:1.6;font-style:italic;color:var(--ink-dim);}
+  .audio-dialog-narration[hidden]{display:none;}
+  .audio-dialog-controls{display:flex;align-items:center;gap:10px;}
+  .audio-dialog-controls .audio-btn{width:28px;height:28px;font-size:10px;}
+  .audio-dialog-controls .audio-progress{flex:1 1 auto;height:4px;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <div class="tb-brand">
+      <div class="brand-title">CODEBASE ODYSSEY</div>
+      <div class="brand-repo" id="repo-label"></div>
+    </div>
+    <div class="tb-center">
+      <button class="tb-nav-btn" id="tb-prev" title="Previous PR (&larr;)">&#8249;</button>
+      <span class="tb-pr-label mono" id="tb-pr-label"></span>
+      <span class="tb-queue-count mono" id="tb-queue-count"></span>
+      <button class="tb-nav-btn" id="tb-next" title="Next PR (&rarr;)">&#8250;</button>
+    </div>
+    <div class="tb-right">
+      <div id="tb-hints"></div>
+    </div>
+  </div>
+
+  <div id="queue-dots-row">
+    <span class="qd-label">Queue</span>
+    <div id="queue-dots-track"><div class="qd-line"></div></div>
+  </div>
+
+  <div id="content-row">
+    <nav id="level-rail">
+      <div class="rail-nav-title">Levels</div>
+      <div id="rail-items"></div>
+    </nav>
+    <div id="content-col">
+      <div id="narration-caption">
+        <div class="caption-text">
+          <div class="pr-title-line" id="caption-title"></div>
+          <p class="narration-text" id="caption-narration"></p>
+        </div>
+        <div id="tb-audio">
+          <button class="audio-btn" id="tb-audio-btn">&#9654;</button>
+          <div class="audio-progress"><div class="audio-fill" id="tb-audio-fill"></div></div>
+          <span class="audio-label" id="tb-audio-label">narration audio</span>
+        </div>
+      </div>
+      <div id="main-content-wrap">
+        <div id="main-content"></div>
+        <div class="scroll-cue bottom" id="scroll-cue-bottom" hidden></div>
+        <div class="scroll-cue top" id="scroll-cue-top" hidden></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="dock">
+    <div class="dock-row1">
+      <span class="decision-status mono" id="status-pill"></span>
+      <div class="dock-row1-actions">
+        <button class="btn-add-comment" id="btn-comments-toggle">Comments (0)</button>
+        <button class="decision-btn close-pr" id="btn-close">Close pull request</button>
+        <div class="split-btn">
+          <button class="split-main" id="btn-merge">Merge pull request</button>
+          <button class="split-arrow" id="btn-merge-arrow" aria-haspopup="true" title="Select merge method">&#9662;</button>
+          <div class="merge-menu" id="merge-menu" hidden>
+            <button class="merge-menu-item" data-method="squash">Squash and merge</button>
+            <button class="merge-menu-item" data-method="rebase">Rebase and merge</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Comments drawer (shadcn Sheet look, recreated in vanilla HTML/CSS) -->
+  <div id="drawer-scrim"></div>
+  <div id="comments-drawer" role="dialog" aria-label="Review comments">
+    <div class="drawer-header">
+      <h2>Review comments</h2>
+      <button class="drawer-close" id="drawer-close-btn" title="Close (Esc)">&times;</button>
+    </div>
+    <div class="drawer-body">
+      <div class="drawer-compose">
+        <div class="drawer-compose-row">
+          <span class="dock-tag-label">Tag:</span>
+          <span class="tag-chip" id="comment-level-chip"></span>
+        </div>
+        <input id="comment-input" type="text" placeholder="Leave a review comment…" autocomplete="off" />
+        <button class="btn-add-comment" id="btn-add-comment">Comment</button>
+      </div>
+      <div class="drawer-list-label">Comments</div>
+      <div class="drawer-list comment-list" id="comment-list"></div>
+    </div>
+    <div class="drawer-footer">
+      <button class="btn-copy-md" id="btn-copy-md">Copy review as markdown</button>
+      <a class="link-btn" id="btn-reset">Reset review</a>
+    </div>
+  </div>
+
+  <!-- ADR detail sheet (same shadcn Sheet family, wider — reachable from any ADR chip).
+       Shares #drawer-scrim above with the comments drawer; only one is open at a time. -->
+  <div id="adr-sheet" role="dialog" aria-label="ADR detail">
+    <div class="drawer-header">
+      <div>
+        <h2 id="adr-sheet-title">ADR</h2>
+        <div class="adr-sheet-meta" id="adr-sheet-meta"></div>
+      </div>
+      <button class="drawer-close" id="adr-sheet-close-btn" title="Close (Esc)">&times;</button>
+    </div>
+    <div class="drawer-body" id="adr-sheet-body"></div>
+  </div>
+
+  <!-- Narration audio dialog (shadcn Dialog look, centered). Shares #drawer-scrim above;
+       mutually exclusive with the comments drawer / ADR sheet — see openAudioDialog. -->
+  <div id="audio-dialog-layer">
+    <div id="audio-dialog" role="dialog" aria-modal="true" aria-label="Narration audio" hidden>
+      <div class="audio-dialog-header">
+        <div class="audio-dialog-title" id="audio-dialog-title"></div>
+        <button class="drawer-close" id="audio-dialog-close-btn" title="Close (Esc)">&times;</button>
+      </div>
+      <img class="audio-dialog-image" id="audio-dialog-image" alt="" hidden>
+      <p class="audio-dialog-narration" id="audio-dialog-narration" hidden></p>
+      <div class="audio-dialog-controls">
+        <button class="audio-btn" id="audio-dialog-btn">&#9654;</button>
+        <div class="audio-progress" id="audio-dialog-progress"><div class="audio-fill" id="audio-dialog-fill"></div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="../data/story.js"></script>
+<script src="../data/manifest.js"></script>
+<script>
+((window.ODYSSEY && window.ODYSSEY.diff_prs) || []).forEach(function(n){
+  document.write('<script src="../data/diffs-pr' + n + '.js"><\/script>');
+});
+</script>
+<script src="../data/adrs.js"></script>
+<script>
+window.DIFFS = window.DIFFS || {};
+window.ADRS = window.ADRS || {};
+(function(){
+  'use strict';
+
+  const STORY = window.STORY;
+  const DISTRICTS = STORY.world.districts;
+  const EXCLUDED_PRS = (window.ODYSSEY && window.ODYSSEY.excluded_prs) || [];
+  const TIMELINE = STORY.timeline.filter(p => !EXCLUDED_PRS.includes(p.pr));
+  const REPO = STORY.meta.repo;
+  const N_LEVELS = 4;
+  const LEVEL_KEYS = ['landscape','problem_solution','architecture','file_changes'];
+  const LEVEL_LABELS = ['Overview', 'Problem & Solution', 'Architecture', 'File Changes'];
+  const LEVEL_TEASER_FALLBACK = ['World state at this point.', 'Why this PR exists.', 'How it fits the system.', 'What actually changed.'];
+
+  const districtsById = {};
+  DISTRICTS.forEach(d => districtsById[d.id] = d);
+
+  // Ported from D's flat-map.dc.html KIND_COLOR / ACCENT_TEXT.
+  const KIND_COLOR = {
+    tooling: 'oklch(0.5 0.14 200)',
+    core: 'oklch(0.4 0.03 250)',
+    quality: 'oklch(0.45 0.12 155)',
+    knowledge: 'oklch(0.45 0.13 285)',
+    product: 'oklch(0.5 0.16 340)',
+    governance: 'oklch(0.5 0.13 60)'
+  };
+  const ACCENT = '#2f8f9d';
+  const ACCENT_TEXT = 'oklch(0.42 0.1 200)';
+
+  // Review states — same lifecycle as Option D. 'merged' state renders with GitHub's
+  // merged-purple (#8250df) per the locked spec; 'commented' is a hollow teal outline.
+  const STATE_COLOR = {
+    pending:   { bg: '#fff',                border: 'rgba(30,40,55,0.35)' },
+    merged:    { bg: '#8250df',             border: '#6b3fc0' },
+    closed:    { bg: 'oklch(0.55 0.02 250)', border: 'oklch(0.4 0.02 250)' },
+    commented: { bg: '#fff',                border: ACCENT }
+  };
+  const STATE_LABEL = { pending: 'Pending review', merged: 'Merged', closed: 'Closed', commented: 'Commented' };
+  const MERGE_METHOD_LABEL = { merge: 'Merge pull request', squash: 'Squash and merge', rebase: 'Rebase and merge' };
+
+  // Scene-art manifest — copied verbatim from Option D/C's HERO_ASSETS (gated to
+  // levels 1-3; level 4 has no art slot in this design).
+  const ASSET_V = Date.now(); // cache-buster: PNGs get regenerated in place with identical names
+  const HERO_ASSETS = new Set((window.ODYSSEY && window.ODYSSEY.hero) || []);
+  // Voice narration slots — derived from story.js: a level with an authored
+  // `voice` script is expected to have a rendered wav (generate_audio.py
+  // writes data/audio/pr<N>_<level>.wav). Keeps the manifest from drifting
+  // when narration is generated for more PRs.
+  const AUDIO_ASSETS = new Set();
+  TIMELINE.forEach(p => {
+    Object.entries(p.levels || {}).forEach(([k, lv]) => {
+      if (lv && lv.voice) AUDIO_ASSETS.add(`pr${p.pr}_${k}.wav`);
+    });
+  });
+
+  /* ============================================================
+     STATE
+     ============================================================ */
+  const state = {
+    prIndex: 0,
+    level: 1,
+    focusDistrict: null,
+    audioPlaying: false,
+    draftMergeMethod: null,
+    mergeMenuOpen: false,
+    // scroll-through cue: null | 'bottom' | 'top'
+    scrollCue: null,
+    cueArmed: false,
+    // shortcut-hints widget: expanded on load; collapses after 3s unless pinned.
+    hintsExpanded: true,
+    hintsPinned: false,
+    // comments drawer: closed by default, opened via dock button / `c` / re-opened state.
+    commentsOpen: false,
+    // ADR sheet: mutually exclusive with the comments drawer (see openCommentsDrawer/openAdrSheet).
+    adrOpen: false,
+    activeAdrId: null,
+    // Audio dialog: mutually exclusive with both sheets above (see openAudioDialog).
+    audioDialogOpen: false,
+    // true while a level/PR content transition animation is in flight — guards re-entrant
+    // nav input (arrow mashing, double rail clicks) from stacking transitions.
+    transitioning: false,
+  };
+  let cueDebounceTimer = null;
+
+  /* ============================================================
+     ANIMATION HELPERS (Motion UMD — window.Motion.animate). Graceful no-op if the CDN
+     script failed to load; opacity-only (transform props stripped) under
+     prefers-reduced-motion.
+     ============================================================ */
+  const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function anim(el, kf, opts){
+    if (!el || !window.Motion) return { finished: Promise.resolve() };
+    if (REDUCED){
+      const { x, y, scale, scaleX, scaleY, rotate, ...rest } = kf;
+      kf = rest;
+      if (!Object.keys(kf).length) return { finished: Promise.resolve() };
+    }
+    return Motion.animate(el, kf, opts);
+  }
+
+  function pr(){ return TIMELINE[state.prIndex]; }
+  function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+  function levelKey(){ return LEVEL_KEYS[state.level - 1]; }
+
+  /* ============================================================
+     REVIEW PERSISTENCE — localStorage odyssey-f:<repo>:<pr>
+     Migrates gracefully from Option D's older 'odyssey-review:' key (same shape) if
+     no odyssey-f entry exists yet; any other/unknown legacy shape is just ignored,
+     never thrown on.
+     ============================================================ */
+  function reviewKey(prNum){ return `odyssey-f:${REPO}:${prNum}`; }
+  function legacyReviewKey(prNum){ return `odyssey-review:${REPO}:${prNum}`; }
+  function defaultReview(){ return { state: 'pending', mergeMethod: 'merge', comments: [] }; }
+  function coerceReview(parsed){
+    let s = parsed.state || 'pending';
+    if (s === 'approved') s = 'merged';
+    else if (s === 'changes_requested' || s === 'rejected') s = 'commented';
+    if (!STATE_LABEL[s]) s = 'pending';
+    const method = MERGE_METHOD_LABEL[parsed.mergeMethod] ? parsed.mergeMethod : 'merge';
+    return { state: s, mergeMethod: method, comments: Array.isArray(parsed.comments) ? parsed.comments : [] };
+  }
+  function loadReview(prNum){
+    try {
+      const raw = localStorage.getItem(reviewKey(prNum));
+      if (raw) return coerceReview(JSON.parse(raw));
+      const legacy = localStorage.getItem(legacyReviewKey(prNum));
+      if (legacy) return coerceReview(JSON.parse(legacy));
+      return defaultReview();
+    } catch (e) {
+      return defaultReview();
+    }
+  }
+  function saveReview(prNum, review){
+    try { localStorage.setItem(reviewKey(prNum), JSON.stringify(review)); } catch (e) { /* storage unavailable */ }
+  }
+  function bundleDraftComment(review){
+    const draft = commentInput.value.trim();
+    if (draft){
+      review.comments.push({ level: levelKey(), text: draft });
+      commentInput.value = '';
+    }
+  }
+
+  function mergePR(){
+    const p = pr();
+    const review = loadReview(p.pr);
+    const method = state.draftMergeMethod || review.mergeMethod || 'merge';
+    review.state = 'merged';
+    review.mergeMethod = method;
+    bundleDraftComment(review);
+    saveReview(p.pr, review);
+    state.draftMergeMethod = null;
+    closeMergeMenu();
+    renderDock();
+    renderQueueDots();
+  }
+  function closePR(){
+    const p = pr();
+    const review = loadReview(p.pr);
+    review.state = 'closed';
+    bundleDraftComment(review);
+    saveReview(p.pr, review);
+    renderDock();
+    renderQueueDots();
+  }
+  function addCommentOnly(){
+    const draft = commentInput.value.trim();
+    if (!draft) return;
+    const p = pr();
+    const review = loadReview(p.pr);
+    review.comments.push({ level: levelKey(), text: draft });
+    if (review.state === 'pending') review.state = 'commented';
+    saveReview(p.pr, review);
+    commentInput.value = '';
+    renderDock();
+    renderQueueDots();
+  }
+  function deleteComment(idx){
+    const p = pr();
+    const review = loadReview(p.pr);
+    review.comments.splice(idx, 1);
+    saveReview(p.pr, review);
+    renderDock();
+  }
+  function resetReview(){
+    const p = pr();
+    localStorage.removeItem(reviewKey(p.pr));
+    state.draftMergeMethod = null;
+    renderDock();
+    renderQueueDots();
+  }
+  function decisionLabel(review){
+    if (review.state === 'merged'){
+      const m = review.mergeMethod;
+      return (m && m !== 'merge') ? `merged (${m})` : 'merged';
+    }
+    return { pending: 'pending', closed: 'closed', commented: 'commented' }[review.state] || 'pending';
+  }
+  // Dock status pill format per spec: "PENDING REVIEW" / "MERGED (SQUASH)" / "CLOSED" / "COMMENTED".
+  function pillLabel(review){
+    if (review.state === 'pending') return 'PENDING REVIEW';
+    return decisionLabel(review).toUpperCase();
+  }
+  function buildMarkdown(){
+    const p = pr();
+    const review = loadReview(p.pr);
+    let md = `## Review — PR #${p.pr}: ${p.title}\nDecision: ${decisionLabel(review)}`;
+    if (review.comments.length){
+      md += '\n' + review.comments.map(c => `- [${c.level}] ${c.text}`).join('\n');
+    }
+    return md;
+  }
+
+  /* ============================================================
+     MERGE DROPDOWN
+     ============================================================ */
+  function openMergeMenu(){ document.getElementById('merge-menu').hidden = false; state.mergeMenuOpen = true; }
+  function closeMergeMenu(){ document.getElementById('merge-menu').hidden = true; state.mergeMenuOpen = false; }
+  function toggleMergeMenu(){ if (state.mergeMenuOpen) closeMergeMenu(); else openMergeMenu(); }
+
+  /* ============================================================
+     CUMULATIVE TOUCH (for L1 heat) — ported from D
+     ============================================================ */
+  function cumulativeTouched(index, id){
+    let sum = 0;
+    for (let i = 0; i <= index; i++){
+      const t = TIMELINE[i].touched || {};
+      if (t[id]) sum += t[id];
+    }
+    return sum;
+  }
+
+  /* ============================================================
+     DERIVED CONTENT — D's pipeline is the base (pass authored content through
+     unchanged when present) but every level always resolves to a non-null object,
+     using E's mechanical-fallback synthesis for summary-depth PRs (e.g. PR #64,
+     which only has a `landscape` level authored). This lets every card render
+     unconditionally at its fixed height instead of branching per-PR.
+     ============================================================ */
+  function deriveLevelContent(prEntry){
+    const touchedIds = Object.keys(prEntry.touched || {});
+    const touchedLabel = touchedIds.map(id => districtsById[id] ? districtsById[id].label : id).join(', ') || 'the repo';
+    const has = prEntry.levels || {};
+    const landscape = has.landscape || {
+      narration: `${prEntry.title}: ${prEntry.size.files} files changed (+${prEntry.size.adds}/−${prEntry.size.dels}) across ${touchedLabel}.`
+    };
+    const problem_solution = has.problem_solution || {
+      narration: 'No authored problem/solution narrative recorded for this PR — mechanical summary shown instead.',
+      problem: `Auto-derived summary: this PR touched ${touchedLabel} (${prEntry.size.files} files, +${prEntry.size.adds}/−${prEntry.size.dels}).`,
+      solution: 'No curated solution narrative recorded. See File Changes for the district-level touch breakdown.',
+      alternatives: [],
+      beats: []
+    };
+    const architecture = has.architecture || {
+      narration: `Districts touched: ${touchedLabel}.`,
+      beats: []
+    };
+    const file_changes = has.file_changes || {
+      narration: 'Mechanical file-touch summary — no curated file groups recorded for this PR.',
+      groups: touchedIds.map(id => ({
+        title: districtsById[id] ? districtsById[id].label : id,
+        note: `${prEntry.touched[id]} touch${prEntry.touched[id] === 1 ? '' : 'es'} recorded in this district (individual filenames not captured).`,
+        files: []
+      }))
+    };
+    return { landscape, problem_solution, architecture, file_changes };
+  }
+
+  /* ============================================================
+     SCENE ART
+     ============================================================ */
+  function heroFrame(prNum, levelIdx, alt){
+    if (levelIdx > 3) return '';
+    const rel = `pr-${prNum}/level-${levelIdx}.png`;
+    if (!HERO_ASSETS.has(rel)) return '';
+    return `<div class="hero-frame"><img src="../assets/${rel}" alt="${escapeHtml(alt)}" loading="lazy"></div>`;
+  }
+
+  function escapeHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function teaser(text, maxWords){
+    const s = (text || '').trim();
+    if (!s) return '';
+    const words = s.split(/\s+/);
+    const head = words.slice(0, maxWords || 12).join(' ');
+    return head + (words.length > (maxWords || 12) ? '…' : '');
+  }
+
+  /* ============================================================
+     RENDER: TOPBAR
+     ============================================================ */
+  function renderTopbar(){
+    const p = pr();
+    document.getElementById('repo-label').textContent = REPO;
+    document.getElementById('tb-pr-label').innerHTML = `<b>PR #${p.pr}</b> · ${escapeHtml(p.title)}`;
+    document.getElementById('tb-queue-count').textContent = `${state.prIndex + 1} / ${TIMELINE.length}`;
+    document.getElementById('tb-prev').disabled = state.prIndex === 0;
+    document.getElementById('tb-next').disabled = state.prIndex === TIMELINE.length - 1;
+    renderHintsWidget();
+  }
+
+  /* ============================================================
+     AUTO-HIDING SHORTCUT HINTS
+     Expanded on load; if the user hasn't pinned them, they collapse to a small chip 3s
+     after load. Clicking the chip expands AND pins (stays open until the collapse control
+     is clicked again). Pinned state persists in localStorage (global — not per-PR).
+     ============================================================ */
+  const HINTS_PIN_KEY = 'odyssey-f:hints-pinned';
+  function loadHintsPinned(){
+    try { return localStorage.getItem(HINTS_PIN_KEY) === '1'; } catch (e) { return false; }
+  }
+  function saveHintsPinned(v){
+    try { localStorage.setItem(HINTS_PIN_KEY, v ? '1' : '0'); } catch (e) { /* unavailable */ }
+  }
+  let hintsCollapseTimer = null;
+  function collapseHints(){
+    if (state.hintsPinned) return; // pinned — never auto-collapses
+    state.hintsExpanded = false;
+    renderHintsWidget();
+  }
+  function expandAndPinHints(){
+    clearTimeout(hintsCollapseTimer);
+    state.hintsExpanded = true;
+    state.hintsPinned = true;
+    saveHintsPinned(true);
+    renderHintsWidget();
+  }
+  function collapseAndUnpinHints(){
+    state.hintsExpanded = false;
+    state.hintsPinned = false;
+    saveHintsPinned(false);
+    renderHintsWidget();
+  }
+  function renderHintsWidget(){
+    const wrap = document.getElementById('tb-hints');
+    if (!wrap) return;
+    if (state.hintsExpanded){
+      wrap.innerHTML = `
+        <span class="kbd-hints">
+          <span><kbd>&larr;&rarr;</kbd>PR</span>
+          <span><kbd>&uarr;&darr;</kbd>level</span>
+          <span><kbd>m</kbd>merge</span>
+          <span><kbd>c</kbd>comment</span>
+          <span><kbd>space</kbd>audio</span>
+        </span>
+        <button class="hints-collapse-btn" id="hints-collapse-btn" title="Hide shortcuts">&#9656;</button>`;
+      const btn = document.getElementById('hints-collapse-btn');
+      if (btn) btn.addEventListener('click', collapseAndUnpinHints);
+      const panel = wrap.querySelector('.kbd-hints');
+      anim(panel, { opacity: [0, 1], y: [-6, 0], scale: [0.97, 1] }, { duration: 0.18, ease: 'ease-out' });
+    } else {
+      wrap.innerHTML = `<button class="hints-chip" id="hints-chip">shortcuts &#9666;</button>`;
+      const chip = document.getElementById('hints-chip');
+      if (chip) chip.addEventListener('click', expandAndPinHints);
+      anim(chip, { opacity: [0, 1], scale: [0.9, 1] }, { duration: 0.14, ease: 'ease-out' });
+    }
+  }
+
+  /* ============================================================
+     RENDER: QUEUE DOT STRIP
+     ============================================================ */
+  function renderQueueDots(){
+    const track = document.getElementById('queue-dots-track');
+    track.querySelectorAll('.qd-dot').forEach(el => el.remove());
+    const N = TIMELINE.length;
+    TIMELINE.forEach((p, i) => {
+      const pct = N > 1 ? (1.5 + (i / (N - 1)) * 97) : 50;
+      const isCurrent = i === state.prIndex;
+      const review = loadReview(p.pr);
+      const colors = STATE_COLOR[review.state] || STATE_COLOR.pending;
+      const size = isCurrent ? 12 : 8;
+      const el = document.createElement('button');
+      el.className = 'qd-dot';
+      el.title = `PR #${p.pr}: ${p.title} — ${STATE_LABEL[review.state]}`;
+      el.style.width = size + 'px';
+      el.style.height = size + 'px';
+      el.style.left = pct + '%';
+      if (isCurrent) el.style.boxShadow = `0 0 0 3px color-mix(in oklch, ${ACCENT} 45%, transparent)`;
+      const fill = document.createElement('span');
+      fill.className = 'qd-dot-fill';
+      fill.style.background = colors.bg;
+      fill.style.border = `2px solid ${colors.border}`;
+      el.appendChild(fill);
+      el.addEventListener('click', () => selectPR(i));
+      track.appendChild(el);
+      if (isCurrent) anim(fill, { scale: [1, 1.35, 1] }, { duration: 0.25, ease: 'ease-out' });
+    });
+  }
+
+  /* ============================================================
+     RENDER: LEFT RAIL (levels + review-state chip)
+     ============================================================ */
+  function renderLevelRail(){
+    const p = pr();
+    // Review status now lives solely in the dock (see renderDock/pillLabel) — no duplicate
+    // chip up here.
+    const content = deriveLevelContent(p);
+    const wrap = document.getElementById('rail-items');
+    wrap.innerHTML = LEVEL_LABELS.map((label, i) => {
+      const n = i + 1;
+      const active = n === state.level;
+      const key = LEVEL_KEYS[i];
+      const t = teaser((content[key] && content[key].narration) || LEVEL_TEASER_FALLBACK[i], 12);
+      return `<div class="rail-item${active ? ' active' : ''}" data-level="${n}">
+        <span class="rail-num mono">${n}</span>
+        <div class="rail-title">${escapeHtml(label)}</div>
+        <div class="rail-teaser">${escapeHtml(t)}</div>
+      </div>`;
+    }).join('');
+    wrap.querySelectorAll('.rail-item').forEach(el => {
+      el.addEventListener('click', () => setLevel(Number(el.dataset.level)));
+    });
+    const activeItem = wrap.querySelector('.rail-item.active');
+    if (activeItem) anim(activeItem, { x: [-2, 0] }, { duration: 0.15, ease: 'ease-out' });
+  }
+
+  /* ============================================================
+     RENDER: NARRATION CAPTION
+     ============================================================ */
+  function renderCaption(){
+    const p = pr();
+    const content = deriveLevelContent(p);
+    const block = content[levelKey()];
+    // Reflects the current LEVEL, not the PR title again — the topbar already carries
+    // "PR #73 · <title>", so repeating it here was pure duplication.
+    document.getElementById('caption-title').textContent = `PR #${p.pr} — ${LEVEL_LABELS[state.level - 1]}`;
+    document.getElementById('caption-narration').textContent = (block && block.narration) || p.tagline || '';
+    renderContentAudio();
+  }
+
+  /* ============================================================
+     RENDER: DECISION DOCK
+     ============================================================ */
+  const commentInput = document.getElementById('comment-input');
+  function renderDock(){
+    const p = pr();
+    const review = loadReview(p.pr);
+
+    const activeMethod = state.draftMergeMethod || review.mergeMethod || 'merge';
+    const mergeBtn = document.getElementById('btn-merge');
+    const mergeArrow = document.getElementById('btn-merge-arrow');
+    mergeBtn.textContent = MERGE_METHOD_LABEL[activeMethod];
+    mergeBtn.classList.toggle('is-merged', review.state === 'merged');
+    mergeArrow.classList.toggle('is-merged', review.state === 'merged');
+
+    document.getElementById('btn-close').classList.toggle('active', review.state === 'closed');
+
+    const pill = document.getElementById('status-pill');
+    const colors = STATE_COLOR[review.state] || STATE_COLOR.pending;
+    pill.textContent = pillLabel(review);
+    pill.style.color = review.state === 'pending' ? 'var(--ink-dim)' : colors.border;
+    pill.style.borderColor = colors.border;
+    pill.style.background = review.state === 'pending' ? 'transparent' : `color-mix(in oklch, ${colors.border} 10%, white)`;
+
+    document.getElementById('btn-comments-toggle').textContent = `Comments (${review.comments.length})`;
+    document.getElementById('comment-level-chip').textContent = levelKey();
+
+    const list = document.getElementById('comment-list');
+    if (!review.comments.length){
+      list.innerHTML = '<div class="comment-empty">No comments yet.</div>';
+    } else {
+      list.innerHTML = review.comments.map((c, idx) => `
+        <div class="comment-row">
+          <span class="level-chip">${escapeHtml(c.level)}</span>
+          <span class="comment-text">${escapeHtml(c.text)}</span>
+          <button class="comment-del" data-idx="${idx}" title="Delete comment">&times;</button>
+        </div>`).join('');
+      list.querySelectorAll('.comment-del').forEach(btn => {
+        btn.addEventListener('click', () => deleteComment(Number(btn.dataset.idx)));
+      });
+    }
+  }
+
+  /* ============================================================
+     CONTENT-PANE AUDIO CONTROL (fixed-width, lives in the caption header — manual
+     play only, stop+switch on PR/level change, always present so the row never
+     reflows whether or not a track exists for the current level)
+     ============================================================ */
+  function currentAudioFile(){
+    const p = pr();
+    return `pr${p.pr}_${levelKey()}.wav`;
+  }
+  function renderContentAudio(){
+    const wrap = document.getElementById('tb-audio');
+    const btn = document.getElementById('tb-audio-btn');
+    const label = document.getElementById('tb-audio-label');
+    const has = AUDIO_ASSETS.has(currentAudioFile());
+    wrap.classList.toggle('disabled', !has);
+    btn.disabled = !has;
+    label.textContent = has ? `narration audio — ${LEVEL_LABELS[state.level - 1]}` : 'narration audio (none for this level)';
+    updateAudioButtonUI();
+  }
+
+  /* ============================================================
+     RENDER: MAIN CONTENT (levels 1-4)
+     ============================================================ */
+  function renderMainContent(){
+    const main = document.getElementById('main-content');
+    const p = pr();
+    const touched = p.touched || {};
+    const content = deriveLevelContent(p);
+    const N = TIMELINE.length;
+
+    if (state.level === 1){
+      let globalMax = 0;
+      DISTRICTS.forEach(d => {
+        const v = cumulativeTouched(N - 1, d.id);
+        if (v > globalMax) globalMax = v;
+      });
+
+      const boxesHtml = DISTRICTS.map(d => {
+        const cum = cumulativeTouched(state.prIndex, d.id);
+        const intensity = globalMax > 0 && cum > 0 ? Math.sqrt(cum / globalMax) : 0;
+        const color = KIND_COLOR[d.kind] || KIND_COLOR.tooling;
+        const w = Math.round(70 + Math.sqrt(d.files) * 9);
+        const bg = `color-mix(in oklch, ${color} ${Math.round(6 + intensity * 22)}%, white)`;
+        const border = `color-mix(in oklch, ${color} ${Math.round(30 + intensity * 50)}%, transparent)`;
+        return `<button class="district-box" data-district="${d.id}" title="${escapeHtml(d.blurb)} — click to see file changes"
+            style="flex:1 1 ${w}px;background:${bg};border-color:${border};">
+          <div class="db-label">${escapeHtml(d.label)}</div>
+          <div class="db-files">${d.files} files</div>
+        </button>`;
+      }).join('');
+
+      const seenKinds = {};
+      const legendHtml = DISTRICTS.filter(d => {
+        if (seenKinds[d.kind]) return false;
+        seenKinds[d.kind] = true;
+        return true;
+      }).map(d => {
+        const color = KIND_COLOR[d.kind] || KIND_COLOR.tooling;
+        return `<span class="legend-item"><span class="legend-swatch" style="background:${color};"></span>${d.kind}</span>`;
+      }).join('');
+
+      main.innerHTML = `
+        <div class="level-stack">
+          ${heroFrame(p.pr, 1, `PR #${p.pr} overview diagram`)}
+          <div class="district-boxes">${boxesHtml}</div>
+          <div class="legend-row">${legendHtml}</div>
+        </div>`;
+      main.querySelectorAll('.district-box').forEach(btn => {
+        btn.addEventListener('click', () => jumpToFileChanges(btn.dataset.district));
+      });
+
+    } else if (state.level === 2){
+      const ps = content.problem_solution;
+      const bgTexts = (ps.beats || []).filter(b => b.kind === 'background').map(b => b.text);
+      const intTexts = (ps.beats || []).filter(b => b.kind === 'intuition').map(b => b.text);
+      const touchHtml = Object.keys(touched).map(id => touchChip(id, touched[id])).join('');
+
+      const cardHtml = (kicker, cls, texts, emptyMsg) => `
+        <div class="fixed-card evidence ${cls}">
+          <div class="fc-kicker">${escapeHtml(kicker)}</div>
+          <div class="fc-body">${texts.length ? texts.map(t => `<p>${escapeHtml(t)}</p>`).join('') : `<span class="fc-empty">${escapeHtml(emptyMsg)}</span>`}</div>
+        </div>`;
+
+      const grid = `
+        <div class="grid-2x2">
+          ${cardHtml('Background', '', bgTexts, 'No background evidence recorded.')}
+          ${cardHtml('Intuition', '', intTexts, 'No intuition evidence recorded.')}
+          <div class="fixed-card problem">
+            <div class="fc-kicker">&#9888; The Problem</div>
+            <div class="fc-body"><p>${escapeHtml(ps.problem || 'No problem statement recorded.')}</p></div>
+          </div>
+          <div class="fixed-card solution">
+            <div class="fc-kicker">&#128161; The Solution</div>
+            <div class="fc-body"><p>${escapeHtml(ps.solution || 'No solution statement recorded.')}</p></div>
+          </div>
+        </div>`;
+
+      const alternatives = ps.alternatives || [];
+      const altHtml = alternatives.length ? `
+        <div>
+          <div class="alt-section-label">Rejected alternatives</div>
+          <div class="alt-row">
+            ${alternatives.map(alt => `
+              <div class="alt-card">
+                <div class="alt-opt">${escapeHtml(alt.option)}</div>
+                <div class="alt-rej">&times; ${escapeHtml(alt.rejected)}</div>
+              </div>`).join('')}
+          </div>
+        </div>` : '';
+
+      main.innerHTML = `
+        <div class="level-stack narrow">
+          ${heroFrame(p.pr, 2, `Before/after PR #${p.pr}`)}
+          <div class="chip-row">${touchHtml}</div>
+          ${grid}
+          ${altHtml}
+        </div>`;
+
+    } else if (state.level === 3){
+      const arch = content.architecture;
+      const beats = arch.beats || [];
+      const adrs = p.adrs || [];
+
+      const adrHtml = adrs.length
+        ? adrs.map(a => `<button class="adr-badge" data-adr-id="${escapeHtml(a)}">${escapeHtml(a)}</button>`).join('')
+        : `<span class="no-adrs">No ADRs recorded for this PR.</span>`;
+
+      const boxesHtml = DISTRICTS.map(d => {
+        const isTouched = !!touched[d.id];
+        const color = KIND_COLOR[d.kind] || KIND_COLOR.tooling;
+        const w = Math.round(70 + Math.sqrt(d.files) * 9);
+        const bg = isTouched ? `color-mix(in oklch, ${color} 16%, white)` : `color-mix(in oklch, ${color} 3%, white)`;
+        const border = isTouched ? color : `color-mix(in oklch, ${color} 12%, transparent)`;
+        return `<div class="district-box static" title="${escapeHtml(d.blurb)}"
+            style="flex:1 1 ${w}px;background:${bg};border-color:${border};opacity:${isTouched ? 1 : 0.45};">
+          <div class="db-label">${escapeHtml(d.label)}</div>
+          ${isTouched ? `<div class="db-touch">&times;${touched[d.id]} touch</div>` : ''}
+        </div>`;
+      }).join('');
+
+      const beatsHtml = beats.length
+        ? `<div class="beats-stack">${beats.map(beatCard).join('')}</div>`
+        : `<div class="empty-card"><div class="empty-detail">No architecture beats recorded for this PR.</div></div>`;
+
+      main.innerHTML = `
+        <div class="level-stack narrow">
+          ${heroFrame(p.pr, 3, `PR #${p.pr} architecture diagram`)}
+          <div class="adr-row">${adrHtml}</div>
+          <div class="district-boxes">${boxesHtml}</div>
+          ${beatsHtml}
+        </div>`;
+      main.querySelectorAll('.adr-badge[data-adr-id]').forEach(btn => {
+        btn.addEventListener('click', () => openAdrSheet(btn.dataset.adrId));
+      });
+
+    } else {
+      const fc = content.file_changes;
+      const groups = (fc.groups && fc.groups.length) ? fc.groups.map(g => ({ title: g.title, note: g.note || '', files: g.files || [] })) : [{
+        title: 'Touched districts (auto-derived)',
+        note: 'No detailed file list recorded for this PR — derived from district touch counts instead.',
+        files: []
+      }];
+
+      const focusDistrict = state.focusDistrict;
+      const focusLabel = focusDistrict && districtsById[focusDistrict] ? districtsById[focusDistrict].label : focusDistrict;
+      const matchesFocus = (g) => {
+        if (!focusDistrict) return false;
+        const hay = (g.title + ' ' + g.files.join(' ')).toLowerCase();
+        return hay.includes(focusDistrict.toLowerCase()) || (focusLabel && hay.includes(focusLabel.toLowerCase()));
+      };
+      const groupsAnnotated = groups.map(g => ({ ...g, match: matchesFocus(g) }));
+      const anyMatch = groupsAnnotated.some(g => g.match);
+
+      const touchHtml = Object.keys(touched).map(id => touchChip(id, touched[id])).join('');
+      const focusBanner = focusDistrict ? `
+        <div class="focus-banner">
+          Jumped here from <b>${escapeHtml(focusLabel)}</b> in the overview.
+          <button id="clear-focus-btn">clear</button>
+        </div>` : '';
+
+      let fileRowCounter = 0;
+      const groupsHtml = groupsAnnotated.map((g, i) => {
+        const open = anyMatch ? g.match : i === 0;
+        const filesHtml = g.files.length ? g.files.map(f => {
+          const diffsForPr = (window.DIFFS_BY_PR && window.DIFFS_BY_PR[p.pr]) || window.DIFFS || {};
+          const hasDiff = Object.prototype.hasOwnProperty.call(diffsForPr, f);
+          const rowId = `fdiff-${fileRowCounter++}`;
+          return `<div class="file-row">
+              <span class="fr-name">${escapeHtml(f)}</span>
+              ${hasDiff
+                ? `<button class="fr-diffbtn" data-file="${escapeHtml(f)}" data-target="${rowId}">view diff</button>`
+                : `<span class="fr-nodiff">diff not captured in prototype</span>`}
+            </div>
+            <div class="fr-diffbody" id="${rowId}" hidden></div>`;
+        }).join('') : `<div class="file-row"><span class="fr-nodiff">no filenames captured for this group — see note above</span></div>`;
+        return `
+          <details ${open ? 'open' : ''} class="file-group${g.match ? ' match' : ''}">
+            <summary>${escapeHtml(g.title)}</summary>
+            <div class="fg-note">${escapeHtml(g.note)}</div>
+            <div class="fg-files">${filesHtml}</div>
+          </details>`;
+      }).join('');
+
+      main.innerHTML = `
+        <div class="level-stack narrower">
+          <div class="chip-row">${touchHtml}</div>
+          ${focusBanner}
+          ${groupsHtml}
+        </div>`;
+
+      const clearBtn = document.getElementById('clear-focus-btn');
+      if (clearBtn) clearBtn.addEventListener('click', clearFocusDistrict);
+
+      main.querySelectorAll('.fr-diffbtn').forEach(btn => {
+        btn.addEventListener('click', () => toggleDiff(btn));
+      });
+    }
+
+    // Reset scroll + cue state whenever content is rebuilt.
+    main.scrollTop = 0;
+    hideCue();
+  }
+
+  function touchChip(id, count){
+    const color = districtsById[id] ? (KIND_COLOR[districtsById[id].kind] || KIND_COLOR.tooling) : KIND_COLOR.tooling;
+    const label = districtsById[id] ? districtsById[id].label : id;
+    return `<span class="touch-chip" style="border-color:${color};color:${color};background:color-mix(in oklch, ${color} 6%, white);">${escapeHtml(label)} &times;${count}</span>`;
+  }
+
+  const KIND_LABEL = { background: 'Background', intuition: 'Intuition', forces: 'Forces', contract: 'Contract', boundary: 'Boundary' };
+  function beatCard(b){
+    const isIntuition = b.kind === 'intuition';
+    return `
+      <div class="fixed-card beat-card${isIntuition ? ' intuition' : ''}">
+        <div class="fc-kicker">${escapeHtml(KIND_LABEL[b.kind] || b.kind)}</div>
+        <div class="fc-body"><p>${escapeHtml(b.text)}</p></div>
+      </div>`;
+  }
+
+  /* ============================================================
+     INLINE DIFF EXPANSION (level 4 — ported/adapted from Option E's
+     renderDiff, day palette)
+     ============================================================ */
+  function classifyDiffLine(line){
+    if (line.indexOf('+++') === 0 || line.indexOf('---') === 0) return 'meta';
+    if (line.indexOf('@@') === 0) return 'hunk';
+    if (line.indexOf('diff ') === 0 || line.indexOf('index ') === 0 || line.indexOf('new file') === 0 || line.indexOf('deleted file') === 0) return 'meta';
+    if (line.charAt(0) === '+') return 'add';
+    if (line.charAt(0) === '-') return 'del';
+    return 'ctx';
+  }
+  function renderDiffHtml(path){
+    const diffsForPr = (window.DIFFS_BY_PR && window.DIFFS_BY_PR[pr().pr]) || window.DIFFS || {};
+    const text = diffsForPr[path];
+    if (!text) return `<div class="diff-line diff-meta">diff not captured in prototype</div>`;
+    return text.split('\n').map(line => {
+      const cls = classifyDiffLine(line);
+      return `<div class="diff-line diff-${cls}">${escapeHtml(line) || '&nbsp;'}</div>`;
+    }).join('');
+  }
+  function toggleDiff(btn){
+    const target = document.getElementById(btn.dataset.target);
+    if (!target) return;
+    if (!target.hidden){
+      target.hidden = true;
+      btn.textContent = 'view diff';
+      return;
+    }
+    if (!target.dataset.filled){
+      target.innerHTML = renderDiffHtml(btn.dataset.file);
+      target.dataset.filled = '1';
+    }
+    target.hidden = false;
+    btn.textContent = 'hide diff';
+  }
+
+  /* ============================================================
+     MANUAL AUDIO PLAYBACK (topbar control)
+     ============================================================ */
+  const narrationAudio = new Audio();
+  narrationAudio.preload = 'none';
+  narrationAudio.addEventListener('timeupdate', () => {
+    if (narrationAudio.duration){
+      const pct = ((narrationAudio.currentTime / narrationAudio.duration) * 100) + '%';
+      const fill = document.getElementById('tb-audio-fill');
+      if (fill) fill.style.width = pct;
+      const dfill = document.getElementById('audio-dialog-fill');
+      if (dfill) dfill.style.width = pct;
+    }
+  });
+  narrationAudio.addEventListener('ended', () => {
+    state.audioPlaying = false;
+    const fill = document.getElementById('tb-audio-fill');
+    if (fill) fill.style.width = '0%';
+    const dfill = document.getElementById('audio-dialog-fill');
+    if (dfill) dfill.style.width = '0%';
+    updateAudioButtonUI();
+    closeAudioDialogUI(); // spec: dialog closes when playback ends
+  });
+  function updateAudioButtonUI(){
+    const icon = state.audioPlaying ? '&#10074;&#10074;' : '&#9654;';
+    const btn = document.getElementById('tb-audio-btn');
+    if (btn) btn.innerHTML = icon;
+    const dbtn = document.getElementById('audio-dialog-btn');
+    if (dbtn) dbtn.innerHTML = icon;
+  }
+  function stopAudio(){
+    narrationAudio.pause();
+    narrationAudio.currentTime = 0;
+    narrationAudio.removeAttribute('src');
+    state.audioPlaying = false;
+    const fill = document.getElementById('tb-audio-fill');
+    if (fill) fill.style.width = '0%';
+    const dfill = document.getElementById('audio-dialog-fill');
+    if (dfill) dfill.style.width = '0%';
+    updateAudioButtonUI();
+    closeAudioDialogUI(); // stopping playback (PR/level switch, Escape, overlay, X, space-stop) always closes the dialog too
+  }
+  function toggleAudio(){
+    const file = currentAudioFile();
+    if (!AUDIO_ASSETS.has(file)) return;
+    if (state.audioPlaying){
+      // Pause only — mirrors the inline widget's own play/pause toggle and does NOT
+      // close the dialog if it's open (closing is a distinct action, see stopAudio).
+      narrationAudio.pause();
+      state.audioPlaying = false;
+      updateAudioButtonUI();
+      return;
+    }
+    narrationAudio.src = `../data/audio/${file}`;
+    const result = narrationAudio.play();
+    state.audioPlaying = true;
+    updateAudioButtonUI();
+    openAudioDialog();
+    if (result && result.catch){
+      result.catch(() => { state.audioPlaying = false; updateAudioButtonUI(); closeAudioDialogUI(); });
+    }
+  }
+  document.getElementById('tb-audio-btn').addEventListener('click', toggleAudio);
+
+  /* ============================================================
+     AUDIO DIALOG (shadcn Dialog look). Reuses the SAME Audio object/timeupdate as the
+     inline caption widget above — no second Audio instance. Mutually exclusive with the
+     comments drawer and ADR sheet (see openCommentsDrawer/openAdrSheet, which close this).
+     ============================================================ */
+  function renderAudioDialogContent(){
+    const p = pr();
+    const content = deriveLevelContent(p);
+    const block = content[levelKey()];
+    document.getElementById('audio-dialog-title').textContent = `PR #${p.pr} — ${LEVEL_LABELS[state.level - 1]}`;
+
+    // Body is the generated level image when one exists for this PR/level (same
+    // HERO_ASSETS manifest the content pane uses via heroFrame — gated to levels 1-3);
+    // falls back to narration text only when no image asset was rendered for this PR.
+    const img = document.getElementById('audio-dialog-image');
+    const narrationEl = document.getElementById('audio-dialog-narration');
+    const rel = state.level <= 3 ? `pr-${p.pr}/level-${state.level}.png` : null;
+    const hasImage = rel && HERO_ASSETS.has(rel);
+    if (hasImage){
+      img.src = `../assets/${rel}`;
+      img.alt = `PR #${p.pr} — ${LEVEL_LABELS[state.level - 1]} scene art`;
+      img.hidden = false;
+      narrationEl.hidden = true;
+      narrationEl.textContent = '';
+    } else {
+      img.hidden = true;
+      img.removeAttribute('src');
+      narrationEl.textContent = (block && block.narration) || p.tagline || '';
+      narrationEl.hidden = false;
+    }
+  }
+  function openAudioDialog(){
+    if (state.commentsOpen) state.commentsOpen = false;
+    if (state.adrOpen) state.adrOpen = false;
+    state.audioDialogOpen = true;
+    renderAudioDialogContent();
+    const dialog = document.getElementById('audio-dialog');
+    dialog.hidden = false;
+    renderSheetVisibility();
+    anim(dialog, { opacity: [0, 1], scale: [0.96, 1] }, { duration: 0.2, ease: 'ease-out' });
+  }
+  // Visual close only — does not touch audio playback. Called by stopAudio() (the
+  // single place that stops the audio element), so every close path stops audio too.
+  function closeAudioDialogUI(){
+    if (!state.audioDialogOpen) return;
+    state.audioDialogOpen = false;
+    renderSheetVisibility();
+    const dialog = document.getElementById('audio-dialog');
+    const exitAnim = anim(dialog, { opacity: [1, 0], scale: [1, 0.96] }, { duration: 0.13, ease: 'ease-in' });
+    // hidden must never stay gated on the animation promise alone: if it stalls (backgrounded
+    // tab, a Motion hiccup, CDN failure mid-flight) the dialog would sit fully opaque-looking
+    // but logically "closed" (scrim gone, state flipped) — a stuck, still-hit-testable modal.
+    // A short timeout mirrors the exit duration and guarantees hide() always runs.
+    let hidDone = false;
+    const hide = () => { if (hidDone) return; hidDone = true; dialog.hidden = true; };
+    Promise.resolve(exitAnim.finished).then(hide, hide);
+    setTimeout(hide, 200);
+  }
+  document.getElementById('audio-dialog-btn').addEventListener('click', toggleAudio);
+  document.getElementById('audio-dialog-close-btn').addEventListener('click', stopAudio);
+
+  /* ============================================================
+     SCROLL-THROUGH NAVIGATION
+     Reaching the bottom (or top) of the main content pane shows a cue bar — but ONLY in
+     response to an actual wheel/trackpad gesture, never automatically on render (that was
+     the bug: short levels used to arm the cue the instant they rendered, so a first touch
+     of the wheel could advance immediately). Advancing then requires a *second*, fresh
+     gesture in the same direction: the cue "arms" only after ~400ms of no wheel events
+     following the moment it first appeared, which filters out the tail of the same
+     momentum-scroll fling that revealed it. A #main-content bottom padding of 40vh (see
+     CSS) also ensures short levels require real scroll motion before the edge is even
+     reached.
+     Both edge checks are recomputed fresh from live scrollTop/scrollHeight on every wheel
+     event (not cached from a prior 'scroll' event) — this is what makes the *upward* case
+     work at all: when the pane is already pinned at scrollTop 0, no further 'scroll' event
+     ever fires, so anything relying on the scroll event alone can never detect "at top".
+     A wheel event whose nearest scrollable ancestor is an inner element (a diff panel, a
+     fixed-height evidence card, ...) is left alone entirely — it never arms or advances
+     the level cue, even once that inner element is scrolled to its own limit.
+     ============================================================ */
+  function armCueAfterDelay(){
+    clearTimeout(cueDebounceTimer);
+    state.cueArmed = false;
+    cueDebounceTimer = setTimeout(() => {
+      state.cueArmed = true;
+      const el = state.scrollCue === 'bottom' ? document.getElementById('scroll-cue-bottom')
+        : state.scrollCue === 'top' ? document.getElementById('scroll-cue-top') : null;
+      if (el && !el.hidden) anim(el, { opacity: [1, 0.55, 1] }, { duration: 0.25, ease: 'ease-out' });
+    }, 400);
+  }
+  function showCue(dir){
+    if (state.scrollCue === dir) return;
+    state.scrollCue = dir;
+    renderCueBars();
+    armCueAfterDelay();
+  }
+  function hideCue(){
+    if (!state.scrollCue) return;
+    state.scrollCue = null;
+    state.cueArmed = false;
+    clearTimeout(cueDebounceTimer);
+    renderCueBars();
+  }
+  function renderCueBars(){
+    const bottomEl = document.getElementById('scroll-cue-bottom');
+    const topEl = document.getElementById('scroll-cue-top');
+    if (state.scrollCue === 'bottom'){
+      const nextLabel = state.level < N_LEVELS ? LEVEL_LABELS[state.level] : 'next PR →';
+      bottomEl.textContent = `⌄ keep scrolling → ${nextLabel}`;
+      const wasHidden = bottomEl.hidden;
+      bottomEl.hidden = false;
+      topEl.hidden = true;
+      if (wasHidden) anim(bottomEl, { opacity: [0, 1], scaleY: [0.6, 1] }, { duration: 0.15, ease: 'ease-out' });
+    } else if (state.scrollCue === 'top'){
+      topEl.textContent = `⌃ keep scrolling → ${LEVEL_LABELS[state.level - 2]}`;
+      const wasHidden = topEl.hidden;
+      topEl.hidden = false;
+      bottomEl.hidden = true;
+      if (wasHidden) anim(topEl, { opacity: [0, 1], scaleY: [0.6, 1] }, { duration: 0.15, ease: 'ease-out' });
+    } else {
+      bottomEl.hidden = true;
+      topEl.hidden = true;
+    }
+  }
+  // Walks up from a wheel event's target to find the nearest ancestor that is itself
+  // internally scrollable (diff panels, fixed-card bodies, ...), stopping at #main-content.
+  // Returns #main-content itself when no such inner element is found first — meaning the
+  // gesture genuinely belongs to the level scroll-through.
+  function nearestScrollableAncestor(el){
+    const main = document.getElementById('main-content');
+    let node = el;
+    while (node && node !== main && node !== document.body && node !== document.documentElement){
+      if (node.nodeType === 1){
+        const cs = getComputedStyle(node);
+        if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll') && node.scrollHeight > node.clientHeight + 1){
+          return node;
+        }
+      }
+      node = node.parentElement;
+    }
+    return main;
+  }
+  // Safety net only: clears a stale cue if the pane moves away from the edge that showed
+  // it (e.g. via scrollbar drag) — never auto-shows a cue on its own.
+  function onMainScroll(){
+    const main = document.getElementById('main-content');
+    const atBottom = main.scrollHeight - main.scrollTop - main.clientHeight < 4;
+    const atTop = main.scrollTop < 4;
+    if (state.scrollCue === 'bottom' && !atBottom) hideCue();
+    else if (state.scrollCue === 'top' && !atTop) hideCue();
+  }
+  function onMainWheel(e){
+    const main = document.getElementById('main-content');
+    if (nearestScrollableAncestor(e.target) !== main) return; // inner element owns this gesture
+
+    const atBottom = main.scrollHeight - main.scrollTop - main.clientHeight < 4;
+    const atTop = main.scrollTop < 4;
+
+    if (e.deltaY > 0 && atBottom){
+      if (state.scrollCue !== 'bottom'){ showCue('bottom'); return; } // gesture 1: reveal only
+      if (state.cueArmed) advanceFromCue('down');                     // gesture 2+: advance
+      return;
+    }
+    if (e.deltaY < 0 && atTop){
+      if (state.scrollCue !== 'top'){ showCue('top'); return; }
+      if (state.cueArmed) advanceFromCue('up');
+      return;
+    }
+    if (state.scrollCue) hideCue();
+  }
+  function advanceFromCue(dir){
+    hideCue();
+    if (dir === 'down'){
+      if (state.level < N_LEVELS) setLevel(state.level + 1);
+      else if (state.prIndex < TIMELINE.length - 1) selectPR(state.prIndex + 1);
+    } else {
+      if (state.level > 1) setLevel(state.level - 1);
+      // No defined behavior for "previous PR" at level 1's top per spec — clamp.
+    }
+  }
+  document.getElementById('main-content').addEventListener('scroll', onMainScroll);
+  document.getElementById('main-content-wrap').addEventListener('wheel', onMainWheel, { passive: true });
+
+  /* ============================================================
+     TOP-LEVEL RENDER
+     ============================================================ */
+  function renderAll(){
+    renderTopbar();
+    renderQueueDots();
+    renderLevelRail();
+    renderCaption();
+    renderDock();
+    renderMainContent();
+    // Deliberately no post-render cue check here — the cue must only ever appear in
+    // response to an actual wheel gesture (see onMainWheel), never automatically.
+  }
+
+  /* ============================================================
+     CONTENT TRANSITION ORCHESTRATOR
+     Shared out/render/in choreography for selectPR (axis x) and setLevel (axis y).
+     state.transitioning guards re-entrant nav (arrow mashing, double clicks) — a
+     triggering input arriving mid-transition is simply ignored by the caller.
+     ============================================================ */
+  function transitionContent(axis, dir, render){
+    state.transitioning = true;
+    const main = document.getElementById('main-content');
+    const caption = document.getElementById('narration-caption');
+    const outX = axis === 'x' ? -dir * 36 : 0;
+    const outY = axis === 'y' ? -dir * 20 : 0;
+    const outAnim = anim(main, { opacity: [1, 0], x: [0, outX], y: [0, outY] }, { duration: 0.13, ease: 'ease-in' });
+    anim(caption, { opacity: [1, 0] }, { duration: 0.13, ease: 'ease-in' });
+
+    // Safety net: an anim().finished promise can stall indefinitely (observed in practice —
+    // a backgrounded/non-foreground tab throttles the rAF/WAAPI ticks Motion relies on to
+    // ever settle it), and both the render() call and the state.transitioning=false reset
+    // below live inside .then()/.finally() chains off that promise. Without this, a single
+    // stalled frame permanently wedges state.transitioning true, silently no-oping every
+    // future selectPR/setLevel call (the `if (state.transitioning) return;` guards at their
+    // top) with no error. runRender()/finish() are idempotent — whichever path (normal
+    // promise resolution or this timer) gets there first does the work; the other becomes a
+    // no-op — so render() still fires exactly once even if only the timer ever fires.
+    let rendered = false;
+    let settled = false;
+    const runRender = () => { if (!rendered){ rendered = true; render(); } };
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(safetyTimer);
+      runRender();
+      main.style.transform = '';
+      main.style.opacity = '';
+      caption.style.opacity = '';
+      state.transitioning = false;
+    };
+    const safetyTimer = setTimeout(finish, 600); // comfortably past the ~330ms normal budget (0.13s out + 0.2s in)
+
+    return Promise.resolve(outAnim.finished).then(() => {
+      runRender();
+      const inX = axis === 'x' ? dir * 36 : 0;
+      const inY = axis === 'y' ? dir * 24 : 0;
+      if (window.Motion){
+        if (!REDUCED) main.style.transform = `translate(${inX}px, ${inY}px)`;
+        main.style.opacity = '0';
+      }
+      const inAnim = anim(main, { opacity: [0, 1], x: [inX, 0], y: [inY, 0] }, { duration: 0.2, ease: 'ease-out' });
+      anim(caption, { opacity: [0, 1] }, { duration: 0.2, ease: 'ease-out' });
+      return Promise.resolve(inAnim.finished);
+    }).finally(finish);
+  }
+
+  /* ============================================================
+     ACTIONS
+     ============================================================ */
+  function selectPR(i){
+    if (state.transitioning) return;
+    const next = clamp(i, 0, TIMELINE.length - 1);
+    const dir = next > state.prIndex ? 1 : (next < state.prIndex ? -1 : 0);
+    const prevIndex = state.prIndex;
+    const apply = () => {
+      state.prIndex = next;
+      state.level = 1;
+      state.focusDistrict = null;
+      state.draftMergeMethod = null;
+      closeMergeMenu();
+      stopAudio();
+      renderAll();
+    };
+    if (dir === 0 || prevIndex === next){ apply(); return; }
+    transitionContent('x', dir, apply);
+  }
+  function setLevel(lvl){
+    if (state.transitioning) return;
+    const next = clamp(lvl, 1, N_LEVELS);
+    const dir = next > state.level ? 1 : (next < state.level ? -1 : 0);
+    const apply = () => {
+      state.level = next;
+      stopAudio();
+      renderAll();
+    };
+    if (dir === 0){ apply(); return; }
+    transitionContent('y', dir, apply);
+  }
+  function jumpToFileChanges(districtId){
+    state.level = 4;
+    state.focusDistrict = districtId;
+    stopAudio();
+    renderAll();
+  }
+  function clearFocusDistrict(){
+    state.focusDistrict = null;
+    renderMainContent();
+  }
+
+  /* ============================================================
+     COMMENTS DRAWER + ADR SHEET (shadcn Sheet look, recreated in vanilla JS/CSS)
+     Both panels share one #drawer-scrim; opening either one closes the other first, so
+     at most one sheet is ever open — this is the "only one sheet at a time" rule.
+     ============================================================ */
+  function renderSheetVisibility(){
+    document.getElementById('comments-drawer').classList.toggle('open', state.commentsOpen);
+    document.getElementById('adr-sheet').classList.toggle('open', state.adrOpen);
+    const scrim = document.getElementById('drawer-scrim');
+    scrim.classList.toggle('open', state.commentsOpen || state.adrOpen || state.audioDialogOpen);
+    scrim.classList.toggle('audio-dim', state.audioDialogOpen);
+  }
+  function openCommentsDrawer(){
+    if (state.adrOpen){ state.adrOpen = false; }
+    if (state.audioDialogOpen) stopAudio(); // mutual exclusivity: closes + stops the audio dialog
+    state.commentsOpen = true;
+    renderSheetVisibility();
+    commentInput.focus();
+  }
+  function closeCommentsDrawer(){
+    state.commentsOpen = false;
+    renderSheetVisibility();
+  }
+  function openAdrSheet(id){
+    if (state.commentsOpen){ state.commentsOpen = false; }
+    if (state.audioDialogOpen) stopAudio(); // mutual exclusivity: closes + stops the audio dialog
+    state.adrOpen = true;
+    state.activeAdrId = id;
+    renderAdrSheet();
+    renderSheetVisibility();
+  }
+  function closeAdrSheet(){
+    state.adrOpen = false;
+    renderSheetVisibility();
+  }
+  function closeAnyOpenSheet(){
+    if (state.commentsOpen) closeCommentsDrawer();
+    else if (state.adrOpen) closeAdrSheet();
+    else if (state.audioDialogOpen) stopAudio();
+  }
+
+  /* ---------- Minimal markdown renderer (headings, bold/italic, inline code, code
+     fences, lists, blockquotes, links — no external library) for ADR body text. ---------- */
+  function renderInline(text){
+    let s = escapeHtml(text);
+    s = s.replace(/`([^`]+)`/g, (m, c) => `<code>${c}</code>`);
+    s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, t, u) => `<a href="${u}" target="_blank" rel="noopener">${t}</a>`);
+    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
+    s = s.replace(/(^|[^\w])_([^_\n]+)_(?!\w)/g, '$1<em>$2</em>');
+    return s;
+  }
+  function renderMarkdown(md){
+    const lines = (md || '').split('\n');
+    let html = '';
+    let para = [];
+    const flushPara = () => {
+      if (para.length){ html += `<p>${renderInline(para.join(' '))}</p>`; para = []; }
+    };
+    let i = 0;
+    while (i < lines.length){
+      const line = lines[i];
+      if (/^```/.test(line)){
+        flushPara();
+        i++;
+        const codeLines = [];
+        while (i < lines.length && !/^```/.test(lines[i])){ codeLines.push(lines[i]); i++; }
+        html += `<pre class="md-code"><code>${escapeHtml(codeLines.join('\n'))}</code></pre>`;
+        i++; // skip closing fence
+        continue;
+      }
+      const heading = line.match(/^(#{1,6})\s+(.*)$/);
+      if (heading){
+        flushPara();
+        const level = Math.min(heading[1].length + 2, 6);
+        html += `<h${level}>${renderInline(heading[2])}</h${level}>`;
+        i++;
+        continue;
+      }
+      if (/^>\s?/.test(line)){
+        flushPara();
+        const quoteLines = [];
+        while (i < lines.length && /^>\s?/.test(lines[i])){ quoteLines.push(lines[i].replace(/^>\s?/, '')); i++; }
+        html += `<blockquote>${quoteLines.map(l => `<p>${renderInline(l)}</p>`).join('')}</blockquote>`;
+        continue;
+      }
+      if (/^\|/.test(line)){
+        flushPara();
+        const tableLines = [];
+        while (i < lines.length && /^\|/.test(lines[i])){ tableLines.push(lines[i]); i++; }
+        html += `<pre class="md-table mono">${escapeHtml(tableLines.join('\n'))}</pre>`;
+        continue;
+      }
+      if (/^[-*]\s+/.test(line)){
+        flushPara();
+        const items = [];
+        while (i < lines.length && /^[-*]\s+/.test(lines[i])){ items.push(lines[i].replace(/^[-*]\s+/, '')); i++; }
+        html += `<ul>${items.map(it => `<li>${renderInline(it)}</li>`).join('')}</ul>`;
+        continue;
+      }
+      if (/^\d+\.\s+/.test(line)){
+        flushPara();
+        const items = [];
+        while (i < lines.length && /^\d+\.\s+/.test(lines[i])){ items.push(lines[i].replace(/^\d+\.\s+/, '')); i++; }
+        html += `<ol>${items.map(it => `<li>${renderInline(it)}</li>`).join('')}</ol>`;
+        continue;
+      }
+      if (line.trim() === ''){ flushPara(); i++; continue; }
+      para.push(line.trim());
+      i++;
+    }
+    flushPara();
+    return html;
+  }
+
+  function adrStateBadgeHtml(s){
+    const isApproved = s === 'approved';
+    const bg = isApproved ? 'oklch(0.94 0.06 145)' : 'oklch(0.96 0.02 250)';
+    const fg = isApproved ? 'oklch(0.4 0.13 145)' : 'var(--ink-dim)';
+    const border = isApproved ? 'oklch(0.6 0.12 145)' : 'var(--line)';
+    return `<span class="adr-state-badge" style="background:${bg};color:${fg};border-color:${border};">${escapeHtml((s || 'unknown').toUpperCase())}</span>`;
+  }
+
+  function renderAdrSheet(){
+    const id = state.activeAdrId;
+    const record = id && window.ADRS ? window.ADRS[id] : null;
+    const titleEl = document.getElementById('adr-sheet-title');
+    const metaEl = document.getElementById('adr-sheet-meta');
+    const body = document.getElementById('adr-sheet-body');
+
+    if (!record){
+      titleEl.textContent = id || 'ADR';
+      metaEl.innerHTML = '';
+      body.innerHTML = `
+        <div class="empty-card">
+          <div class="empty-detail">ADR record not captured in this prototype's snapshot.</div>
+        </div>`;
+      return;
+    }
+
+    titleEl.textContent = record.title || record.id;
+    const sourceLine = record.source_pr ? `source: PR #${record.source_pr}` : '';
+    const approvedLine = record.approved_by ? `approved by ${record.approved_by}` : '';
+    const metaLine = [sourceLine, approvedLine].filter(Boolean).join(' · ');
+    metaEl.innerHTML = adrStateBadgeHtml(record.state) + (metaLine ? `<span class="adr-sheet-sourceline">${escapeHtml(metaLine)}</span>` : '');
+
+    const altsAll = record.alternatives || [];
+    const altCard = (a) => `<div class="alt-card"><div class="alt-opt">${escapeHtml(a.option)}</div><div class="alt-rej">&times; ${escapeHtml(a.rejected_because)}</div></div>`;
+    let altsHtml = '';
+    if (altsAll.length){
+      const visible = altsAll.slice(0, 2);
+      const hidden = altsAll.slice(2);
+      altsHtml = `
+        <div>
+          <div class="alt-section-label">Rejected alternatives</div>
+          <div class="alt-row">${visible.map(altCard).join('')}</div>
+          ${hidden.length ? `
+            <button class="link-btn" id="adr-alts-more-btn" style="margin-top:8px;">+${hidden.length} more</button>
+            <div class="alt-row" id="adr-alts-hidden" hidden style="margin-top:8px;">${hidden.map(altCard).join('')}</div>
+          ` : ''}
+        </div>`;
+    }
+
+    const forces = record.forces || [];
+    const forcesHtml = forces.length ? `
+      <div>
+        <div class="alt-section-label">Forces</div>
+        <div class="chip-row">${forces.map(f => `<span class="force-chip">${escapeHtml(f)}</span>`).join('')}</div>
+      </div>` : '';
+
+    const d = record.delivers;
+    const deliversHtml = d ? `
+      <div class="adr-block">
+        <div class="ab-kicker" style="color:var(--accent-text);">Delivers</div>
+        <dl class="adr-delivers-dl">
+          <dt>Capability</dt><dd>${escapeHtml(d.capability || '—')}</dd>
+          <dt>Benefit</dt><dd>${escapeHtml(d.benefit || '—')}</dd>
+          <dt>Beneficiary</dt><dd>${escapeHtml((d.beneficiary || []).join(', ') || '—')}</dd>
+        </dl>
+      </div>` : '';
+
+    body.innerHTML = `
+      <div class="adr-block problem">
+        <div class="ab-kicker">Problem</div>
+        <p>${escapeHtml(record.problem || '—')}</p>
+      </div>
+      <div class="adr-block decision">
+        <div class="ab-kicker">Decision</div>
+        <p>${escapeHtml(record.decision || '—')}</p>
+      </div>
+      ${altsHtml}
+      ${forcesHtml}
+      ${deliversHtml}
+      <div class="adr-body-md">${renderMarkdown(record.body || '')}</div>
+    `;
+
+    const moreBtn = document.getElementById('adr-alts-more-btn');
+    if (moreBtn){
+      moreBtn.addEventListener('click', () => {
+        document.getElementById('adr-alts-hidden').hidden = false;
+        moreBtn.hidden = true;
+      });
+    }
+  }
+
+  document.getElementById('tb-prev').addEventListener('click', () => selectPR(state.prIndex - 1));
+  document.getElementById('tb-next').addEventListener('click', () => selectPR(state.prIndex + 1));
+
+  document.getElementById('btn-merge').addEventListener('click', mergePR);
+  document.getElementById('btn-merge-arrow').addEventListener('click', (e) => { e.stopPropagation(); toggleMergeMenu(); });
+  document.getElementById('merge-menu').querySelectorAll('.merge-menu-item').forEach(item => {
+    item.addEventListener('click', () => {
+      state.draftMergeMethod = item.dataset.method;
+      closeMergeMenu();
+      renderDock();
+    });
+  });
+  document.addEventListener('click', (e) => {
+    if (state.mergeMenuOpen && !e.target.closest('.split-btn')) closeMergeMenu();
+  });
+  document.getElementById('btn-close').addEventListener('click', closePR);
+  document.getElementById('btn-comments-toggle').addEventListener('click', openCommentsDrawer);
+  document.getElementById('drawer-close-btn').addEventListener('click', closeCommentsDrawer);
+  document.getElementById('adr-sheet-close-btn').addEventListener('click', closeAdrSheet);
+  document.getElementById('drawer-scrim').addEventListener('click', closeAnyOpenSheet);
+  document.getElementById('btn-add-comment').addEventListener('click', addCommentOnly);
+  commentInput.addEventListener('keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); addCommentOnly(); } });
+  document.getElementById('btn-reset').addEventListener('click', resetReview);
+  document.getElementById('btn-copy-md').addEventListener('click', () => {
+    const md = buildMarkdown();
+    const btn = document.getElementById('btn-copy-md');
+    const flash = (ok) => {
+      btn.textContent = ok ? 'Copied!' : 'Copy failed';
+      btn.classList.toggle('flash', ok);
+      setTimeout(() => { btn.textContent = 'Copy review as markdown'; btn.classList.remove('flash'); }, 1400);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(md).then(() => flash(true)).catch(() => flash(false));
+    } else {
+      flash(false);
+    }
+  });
+
+  window.addEventListener('keydown', (e) => {
+    // Escape must close whichever sheet is open, even while the comment input is
+    // focused — checked before the input/textarea early-return below so it always works.
+    if (e.key === 'Escape' && (state.commentsOpen || state.adrOpen || state.audioDialogOpen)){ closeAnyOpenSheet(); return; }
+
+    const tag = document.activeElement && document.activeElement.tagName;
+    if (tag === 'TEXTAREA' || tag === 'INPUT') return;
+    if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) e.preventDefault();
+    if (e.key === 'ArrowLeft') selectPR(state.prIndex - 1);
+    else if (e.key === 'ArrowRight') selectPR(state.prIndex + 1);
+    else if (e.key === 'ArrowUp') setLevel(state.level - 1);
+    else if (e.key === 'ArrowDown') setLevel(state.level + 1);
+    else if (e.key === 'm') mergePR();
+    else if (e.key === 'c') { e.preventDefault(); openCommentsDrawer(); }
+    else if (e.key === ' '){
+      // Always preventDefault so Space never page-scrolls the content pane. Spec: space
+      // starts playback (opening the dialog) when it's closed, but once the dialog is
+      // open a second space is "stop" — full stop + close, not a play/pause toggle.
+      e.preventDefault();
+      if (state.audioDialogOpen) stopAudio();
+      else toggleAudio();
+    }
+  });
+
+  // Start on PR #73 if present (matches Option E's default focus PR for this demo data).
+  const initialIdx = TIMELINE.findIndex(p => p.pr === 73);
+  state.prIndex = initialIdx >= 0 ? initialIdx : 0;
+
+  renderAll();
+
+  // Shortcut hints: expanded on load; auto-collapse after 3s unless the user has pinned
+  // them open (persisted from a previous session).
+  state.hintsPinned = loadHintsPinned();
+  state.hintsExpanded = true;
+  renderHintsWidget();
+  if (!state.hintsPinned){
+    hintsCollapseTimer = setTimeout(collapseHints, 3000);
+  }
+})();
+</script>
+</body>
+</html>
