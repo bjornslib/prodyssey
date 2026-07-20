@@ -70,6 +70,34 @@ def get_remote_origin(repo: Path) -> str | None:
         return None
 
 
+def detect_default_branch(repo: Path) -> str:
+    """Detect the repo's default branch: origin/HEAD symref first, then try
+    `main` and `master` directly. Exits 1 with remediation if none resolve."""
+    try:
+        out = run_git(repo, ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]).strip()
+        if out.startswith("origin/"):
+            out = out[len("origin/"):]
+        if out:
+            return out
+    except subprocess.CalledProcessError:
+        pass
+
+    for candidate in ("main", "master"):
+        try:
+            run_git(repo, ["rev-parse", "--verify", "--quiet", candidate])
+            return candidate
+        except subprocess.CalledProcessError:
+            continue
+
+    print(
+        "error: could not detect the default branch.\n"
+        "Tried: `git symbolic-ref --short refs/remotes/origin/HEAD`, then `main`, then `master`.\n"
+        "remediation: pass --dot-range <branch> explicitly.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+
 def commit_kind(repo: Path, sha: str) -> str:
     out = run_git(repo, ["rev-list", "--parents", "-n", "1", sha]).strip()
     parts = out.split()
@@ -125,10 +153,18 @@ def try_gh_pr(repo: Path, pr_num: int) -> dict | None:
     return {"hash": merge_commit, "pr": pr_num, "kind": commit_kind(repo, merge_commit)}
 
 
-def resolve_prs(repo: Path, pr_nums: list[int]) -> dict[int, dict]:
-    rev = "main"
-    merges = discover_merge_prs(repo, rev)
-    squashes = discover_squash_prs(repo, rev)
+def resolve_prs(repo: Path, pr_nums: list[int], dot_range: str | None) -> dict[int, dict]:
+    rev = dot_range or detect_default_branch(repo)
+    try:
+        merges = discover_merge_prs(repo, rev)
+        squashes = discover_squash_prs(repo, rev)
+    except subprocess.CalledProcessError as e:
+        print(
+            f"error: git discovery failed for rev '{rev}': {e}\n"
+            "remediation: verify the revision/range exists in this repo, or pass --dot-range explicitly.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     combined: dict[int, dict] = {}
     for entry in squashes + merges:  # merges added last so they win on conflict
         combined[entry["pr"]] = entry
@@ -267,6 +303,11 @@ def main() -> None:
     parser.add_argument("--repo", default=None, help="path to the target git repo (default: cwd)")
     parser.add_argument("--bundle-dir", default=None, help="bundle output dir (default: <repo>/.odyssey)")
     parser.add_argument("--prs", required=True, help="comma-separated PR numbers, e.g. 73,75")
+    parser.add_argument(
+        "--dot-range",
+        default=None,
+        help="git revision to scan for PR merge/squash commits (default: repo's detected default branch)",
+    )
     parser.add_argument("--force", action="store_true", help="overwrite diffs-pr{N}.js files that already exist")
     args = parser.parse_args()
 
@@ -280,7 +321,7 @@ def main() -> None:
         print("error: --prs must list at least one PR number.\nremediation: pass --prs N[,M,...]", file=sys.stderr)
         sys.exit(1)
 
-    resolved = resolve_prs(repo, pr_nums)
+    resolved = resolve_prs(repo, pr_nums, args.dot_range)
 
     data_dir.mkdir(parents=True, exist_ok=True)
     for pr_num in pr_nums:

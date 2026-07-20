@@ -167,16 +167,19 @@ def build_level4(pr: dict, districts_by_id: dict) -> str:
     return scene
 
 
-def build_prompts(story: dict, prs_filter: list[int] | None) -> list[dict]:
+def build_prompts(story: dict, prs_filter: list[int] | None, levels_filter: list[int]) -> list[dict]:
     districts_by_id = {d["id"]: d for d in story["world"]["districts"]}
     level_names = story["meta"]["levels"]
     timeline = story["timeline"]
     if prs_filter is not None:
         wanted = set(prs_filter)
         timeline = [pr for pr in timeline if pr["pr"] in wanted]
+    wanted_levels = set(levels_filter)
     prompts = []
     for pr in timeline:
         for i, level_key in enumerate(LEVEL_KEYS, start=1):
+            if i not in wanted_levels:
+                continue
             level_name = level_names[i - 1]
             if level_key == "file_changes":
                 prompt = f"{SHARED_STYLE} {build_level4(pr, districts_by_id)}"
@@ -353,6 +356,13 @@ def main() -> None:
     parser.add_argument("--repo", default=None, help="path to the target git repo (default: cwd)")
     parser.add_argument("--bundle-dir", default=None, help="bundle output dir (default: <repo>/.odyssey)")
     parser.add_argument("--prs", default=None, help="comma-separated PR numbers (default: all timeline PRs)")
+    parser.add_argument(
+        "--levels",
+        default="1,2,3",
+        help="comma-separated level numbers to generate (1=landscape, 2=problem_solution, "
+        "3=architecture, 4=file_changes; default: 1,2,3 — the bundle/viewer only render art "
+        "for levels 1-3, pass --levels 1,2,3,4 to also generate level 4)",
+    )
     parser.add_argument("--generate", action="store_true", help="call Gemini and render PNGs for each prompt")
     parser.add_argument("--model", default=DEFAULT_MODEL, help=f"Gemini model id (default: {DEFAULT_MODEL})")
     parser.add_argument("--force", action="store_true", help="re-render PNGs that already exist")
@@ -370,8 +380,27 @@ def main() -> None:
     if args.prs:
         prs_filter = sorted({int(x.strip()) for x in args.prs.split(",") if x.strip()})
 
+    levels_filter = sorted({int(x.strip()) for x in args.levels.split(",") if x.strip()})
+    if not levels_filter or any(l < 1 or l > 4 for l in levels_filter):
+        print("error: --levels must list integers 1-4.\nremediation: pass e.g. --levels 1,2,3", file=sys.stderr)
+        sys.exit(1)
+
+    if args.generate:
+        # Fail the API-key gate before writing any artifacts, not after prompts.json exists.
+        from dotenv import load_dotenv
+        load_dotenv(repo / ".env")
+        if not os.environ.get("GEMINI_API_KEY"):
+            print(
+                "GEMINI_API_KEY is not set.\n\n"
+                "Get an API key from https://aistudio.google.com/apikey and run:\n"
+                "  export GEMINI_API_KEY=your-key-here\n"
+                "  uv run generate_prompts.py --repo <path> --generate\n",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
     story = load_story(story_json)
-    prompts = build_prompts(story, prs_filter)
+    prompts = build_prompts(story, prs_filter, levels_filter)
 
     data_dir.mkdir(parents=True, exist_ok=True)
     prompts_json.write_text(json.dumps(prompts, indent=2, ensure_ascii=False) + "\n")

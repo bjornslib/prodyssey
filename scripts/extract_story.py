@@ -85,6 +85,34 @@ def get_remote_origin(repo: Path) -> str | None:
         return None
 
 
+def detect_default_branch(repo: Path) -> str:
+    """Detect the repo's default branch: origin/HEAD symref first, then try
+    `main` and `master` directly. Exits 1 with remediation if none resolve."""
+    try:
+        out = run_git(repo, ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]).strip()
+        if out.startswith("origin/"):
+            out = out[len("origin/"):]
+        if out:
+            return out
+    except subprocess.CalledProcessError:
+        pass
+
+    for candidate in ("main", "master"):
+        try:
+            run_git(repo, ["rev-parse", "--verify", "--quiet", candidate])
+            return candidate
+        except subprocess.CalledProcessError:
+            continue
+
+    print(
+        "error: could not detect the default branch.\n"
+        "Tried: `git symbolic-ref --short refs/remotes/origin/HEAD`, then `main`, then `master`.\n"
+        "remediation: pass --dot-range <branch> explicitly.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+
 def discover_merge_prs(repo: Path, rev: str) -> list[dict]:
     out = run_git(repo, ["log", "--merges", "--format=%h|%ad|%s", "--date=short", rev])
     prs = []
@@ -168,10 +196,18 @@ def discover_prs(repo: Path, dot_range: str | None, prs_filter: list[int] | None
     `gh pr view` for any not found by the scan.
     """
     apply_default_limit = dot_range is None
-    rev = dot_range or "main"
+    rev = dot_range or detect_default_branch(repo)
 
-    merges = discover_merge_prs(repo, rev)
-    squashes = discover_squash_prs(repo, rev)
+    try:
+        merges = discover_merge_prs(repo, rev)
+        squashes = discover_squash_prs(repo, rev)
+    except subprocess.CalledProcessError as e:
+        print(
+            f"error: git discovery failed for rev '{rev}': {e}\n"
+            "remediation: verify the revision/range exists in this repo, or pass --dot-range explicitly.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     combined_by_num: dict[int, dict] = {}
     for entry in squashes + merges:  # merges added last so they win on conflict
