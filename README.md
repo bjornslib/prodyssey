@@ -82,6 +82,20 @@ Every artifact is checked before it is produced (AC G6). Kill the sweep
 mid-run, re-invoke, and completed narratives/images/audio are skipped —
 `--force` regenerates.
 
+### Targeting another checkout
+
+You don't have to open a session inside the repo you want a story for —
+`--repo` points the whole sweep at any local checkout:
+
+```
+/prodyssey:generate --repo ~/code/other-project --prs 42,43
+/prodyssey:baseline --repo ~/code/other-project
+```
+
+The bundle lands in that repo's `.odyssey/`, and `GEMINI_API_KEY` is looked up
+in that repo's `.env` (or your environment). If Claude lacks read access to the
+path, grant it once with `/add-dir ~/code/other-project`.
+
 ---
 
 ## Output: the bundle
