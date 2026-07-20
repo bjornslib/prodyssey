@@ -23,6 +23,22 @@ repo — it never edits the target repo's source, only writes into `.odyssey/`.
 Reference material lives in `references/` and is loaded on demand, not inlined here.
 Scripts live in `scripts/` and are called via `uv run`, never edited by the skill.
 
+## Target resolution
+
+`<target>` — the repo being analyzed — is resolved in this order:
+
+1. An explicit `--repo <path>` argument forwarded by the command. This may be ANY
+   local checkout, not just the repo the session is running in (e.g.
+   `/prodyssey:generate --repo ~/code/other-project --prs 12`).
+2. Otherwise: the git toplevel of the session's working directory.
+
+When `--repo` points outside the session's working directory, narrative authoring
+requires read access to that path. If reads are being denied, tell the user to run
+`/add-dir <path>` (or add the path to their permissions) and retry — do not work
+around it by guessing at file contents. All script invocations below pass the
+resolved path as `--repo <target>`; the bundle always lands at `<target>/.odyssey/`
+unless the user overrides `--bundle-dir`.
+
 ## Step 0 — Prereq gate (hard, before ANYTHING generative)
 
 Run this before any other step, every invocation:

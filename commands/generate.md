@@ -12,8 +12,10 @@ voice narration — into `.odyssey/`. If no baseline exists yet, one is derived
 automatically first.
 
 Invoke the `odyssey` skill in generate mode, forwarding any arguments the user
-supplied after `/prodyssey:generate` (`--prs`, `--latest`, `--force`,
-`--voice`):
+supplied after `/prodyssey:generate` (`--repo`, `--prs`, `--latest`, `--force`,
+`--voice`). `--repo <path>` targets any local checkout — not just the repo this
+session is running in (the skill will ask for `/add-dir` if it lacks read
+access there):
 
 ```
 Skill("odyssey", args="generate $ARGUMENTS")
@@ -34,4 +36,5 @@ unconfirmed PR list.
 /prodyssey:generate --latest
 /prodyssey:generate --prs 12..18
 /prodyssey:generate --force
+/prodyssey:generate --repo ~/code/other-project --prs 42
 ```

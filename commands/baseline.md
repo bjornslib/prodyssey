@@ -12,7 +12,8 @@ Derives (or refreshes) the current repo's architecture baseline into
 re-run any time.
 
 Invoke the `odyssey` skill in baseline mode, forwarding any arguments the user
-supplied after `/prodyssey:baseline` (e.g. `--force`):
+supplied after `/prodyssey:baseline` (e.g. `--force`, or `--repo <path>` to
+target any local checkout other than the current session's repo):
 
 ```
 Skill("odyssey", args="baseline $ARGUMENTS")
