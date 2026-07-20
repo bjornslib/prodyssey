@@ -46,6 +46,20 @@ to name files — group them by shared intent (e.g. "DDD rename & feedback
 sidecar," "Pi SDK extension"), 3-6 files per group, with a one-sentence `note`
 on why the group is one unit of change.
 
+`verify_bundle.py` requires a non-empty `narration` for level 3 on every PR,
+with no exception for PRs that carry no structural decision — so "exists only
+when the PR carries real architectural weight" is about the *content*, not
+about whether the field gets written. For a PR with zero ADRs (`adrs: []`,
+per `decision-records-lite.md` §3.3's "most PRs produce zero or one" rule),
+the expected level-3 content is an honest, one- or two-sentence null-decision
+statement: say plainly that the PR touches no module boundary, dependency
+direction, or public interface, and name what kind of change it actually is
+(docs, style, config, test-only, etc.) instead of inventing forces or
+alternatives to fill the field. That statement satisfies both this
+reference's "only when it carries weight" discipline and `verify_bundle.py`'s
+unconditional non-empty check — it is the correct content for a decision-free
+PR, not a workaround.
+
 ## 3. Style rules (mandatory)
 
 - Write with the clarity and flow of Martin Kleppmann: short declarative
