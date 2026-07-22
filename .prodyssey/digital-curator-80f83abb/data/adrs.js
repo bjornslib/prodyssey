@@ -1,0 +1,59 @@
+window.ADRS = {
+  "ADR-0001": {
+    "id": "ADR-0001",
+    "title": "Run on-device inference in a hidden BrowserWindow, not onnxruntime-node",
+    "state": "approved",
+    "source_pr": 1,
+    "problem": "SecurePII needs the same local `openai/privacy-filter` token-classification model the Chrome extension already runs, ported into an Electron main/renderer process split, without re-hardening the model lifecycle (WebGPU/WASM fallback, pinned revision, versioned Cache API storage, quota pre-flight) that had already taken real effort to stabilize in `src/background/privacy-filter.ts`.",
+    "decision": "Reuse the existing `privacy-filter.ts` module unmodified inside a hidden, lazily-created `BrowserWindow` (`show: false`), talking to the main process over IPC instead of `chrome.runtime.sendMessage` — the desktop analogue of the extension's offscreen document.",
+    "alternatives": [
+      {
+        "option": "Run inference in the main process (or a utilityProcess) via onnxruntime-node",
+        "rejected_because": "Faster CPU inference and no hidden window, but a different runtime (CoreML/CPU execution providers instead of WebGPU/WASM), a different weight-loading path, a native module that needs notarizing, and a full rewrite of the loading/caching/progress code that had just been hardened for the extension."
+      }
+    ],
+    "forces": [
+      "Electron's Chromium provides navigator.gpu, Cache API, and navigator.storage.estimate() in a renderer, so the existing WebGPU-first/WASM-fallback code ports by abstracting only the two chrome.* call sites (WASM asset URLs, progress messages).",
+      "A hidden BrowserWindow can spawn Web Workers, unlike an extension offscreen document — WASM fallback regains multithreading (numThreads = hardwareConcurrency - 1) as a byproduct.",
+      "Maximizing reuse of already-stabilized model-lifecycle code was the deciding factor over raw inference speed."
+    ],
+    "delivers": {
+      "capability": "100% local PII inference inside the Electron app with zero behavior divergence from the extension's model pipeline.",
+      "benefit": "Ships v1 without re-solving model loading, caching, and fallback bugs a second time, and gets multithreaded WASM as a free performance win on Intel Macs.",
+      "beneficiary": [
+        "developer",
+        "operator"
+      ]
+    },
+    "body": "## Context\nSecurePII (the Electron menu-bar port of the Chrome extension's privacy filter, per SD-ELECTRON-PORT-001 §3.2) needs the same on-device token-classification model the extension already runs, without regressing the WebGPU/WASM fallback and cache-versioning work already done.\n\n## Options considered\n1. Hidden BrowserWindow running the existing privacy-filter.ts (chosen).\n2. onnxruntime-node in the main process or a utilityProcess (rejected — different runtime, native module, full rewrite of hardened loading/caching code).\n\n## Decision\nReuse `privacy-filter.ts` verbatim inside a hidden, lazily-created BrowserWindow (`desktop/src/inference/`), driven over IPC from `desktop/src/main/inference-host.ts`.\n\n## Consequences\nOne extra Electron process is created lazily on first redaction. WASM fallback gains multithreading it never had in the extension's offscreen-document context.\n\n## Value delivered\nZero-divergence local inference reused from the extension, at the cost of one hidden renderer process.\n\n## Maps to\nsrc (extension inference module reused), desktop (hidden inference host)",
+    "related_decisions": []
+  },
+  "ADR-0002": {
+    "id": "ADR-0002",
+    "title": "Share redaction code via a plain chrome-free module, not an npm-workspaces monorepo restructure",
+    "state": "approved",
+    "source_pr": 1,
+    "problem": "SecurePII's clipboard monitor needs the same placeholder-instruction text the extension appends to pasted text (`PLACEHOLDER_INSTRUCTIONS`), so the model treats redaction placeholders as opaque tokens in both apps identically.",
+    "decision": "Extract `PLACEHOLDER_INSTRUCTIONS` into a new chrome-free module, `src/shared/paste-instruction.ts`, imported by the desktop app via a plain relative import (`desktop/src/main/clipboard-monitor.ts`); the extension's own `paste-interceptor.ts` re-exports the same symbol so existing extension imports keep working unchanged.",
+    "alternatives": [
+      {
+        "option": "Restructure the repo into npm workspaces (packages/core, packages/inference, packages/ui consumed by apps/extension and apps/desktop), per SD-ELECTRON-PORT-001 §5.1",
+        "rejected_because": "The SD proposed this as the target layout, but the shipped PR did not carry it out — it moved one shared constant into src/shared/ and kept both apps as siblings at the repo root (src/ and desktop/) rather than adopting the packages/apps workspace split."
+      }
+    ],
+    "forces": [
+      "src/shared/ already existed as the extension's cross-surface module (store, storage, redaction, types) shared between background/content/sidepanel/popup, so adding one more chrome-free file there cost nothing structurally.",
+      "A full workspace restructure (SD §5.1) touches every import path in both apps at once — far more invasive than the single symbol this PR needed to share for v0.",
+      "desktop/ has its own package.json, tsconfig.json, and CI (`npm run ci`) entirely separate from the root — the two apps stay independently buildable rather than becoming workspace members."
+    ],
+    "delivers": {
+      "capability": "Byte-identical placeholder-instruction text in both the extension and SecurePII without a repo-wide restructure.",
+      "benefit": "Ships the desktop v0 fast; the monorepo split from the SD stays available as a future step if more shared surface accumulates.",
+      "beneficiary": [
+        "developer"
+      ]
+    },
+    "body": "## Context\nBoth apps need to append the identical LLM instruction after redacted text. SD-ELECTRON-PORT-001 §5.1 proposed a full npm-workspaces monorepo restructure (packages/core, inference, ui + apps/extension, desktop) as the target code-sharing layout.\n\n## Options considered\n1. Move the one shared constant into src/shared/paste-instruction.ts, imported by desktop/ via a relative path; re-export from the extension's old location for compatibility (chosen).\n2. Carry out the packages/apps workspace restructure proposed in the SD (rejected for this PR — out of scope for a v0 port).\n\n## Decision\nsrc/shared/paste-instruction.ts holds the constant; desktop/src/main/clipboard-monitor.ts imports it by relative path; src/content/paste-interceptor.ts re-exports the same symbol.\n\n## Consequences\nThe two apps remain siblings at the repo root, each with independent package.json/tsconfig/CI, rather than becoming npm-workspace members. Future shared surface (redaction.ts, categories, UI components) will face the same choice again.\n\n## Value delivered\nParity of placeholder text across both apps, shipped without a repo-wide restructure.\n\n## Maps to\nsrc (shared module gains a chrome-free file), desktop (consumes it by relative import)",
+    "related_decisions": []
+  }
+};

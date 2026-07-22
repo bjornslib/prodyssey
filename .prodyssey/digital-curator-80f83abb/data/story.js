@@ -1,0 +1,320 @@
+window.STORY = {
+  "meta": {
+    "repo": "digital-curator",
+    "generated": "2026-07-21",
+    "schema_version": "1.0",
+    "title": "digital-curator — Codebase Odyssey",
+    "description": "",
+    "levels": [
+      "PR Landscape",
+      "Problem & Solution",
+      "Architecture",
+      "File Changes"
+    ]
+  },
+  "world": {
+    "districts": [
+      {
+        "id": ".beads",
+        "label": "Beads Tracker State",
+        "kind": "governance",
+        "files": 22,
+        "blurb": "Local Dolt/beads issue-tracker database (backups, credential key) committed in-repo for task tracking — not application code.",
+        "root_paths": [
+          ".beads"
+        ]
+      },
+      {
+        "id": "acceptance-tests",
+        "label": "Acceptance Tests",
+        "kind": "quality",
+        "files": 4,
+        "blurb": "Standalone acceptance-test suite separate from the unit/e2e tests under tests/.",
+        "root_paths": [
+          "acceptance-tests"
+        ]
+      },
+      {
+        "id": "desktop",
+        "label": "SecurePII Desktop (Electron)",
+        "kind": "product",
+        "files": 51,
+        "blurb": "Electron macOS menu-bar port (\"SecurePII\") of the extension's redaction engine — main/preload/renderer/overlay/inference processes, own package.json and build scripts, redacts clipboard content before it reaches an AI chat.",
+        "root_paths": [
+          "desktop"
+        ]
+      },
+      {
+        "id": "dist",
+        "label": "Extension Build Output",
+        "kind": "tooling",
+        "files": 26,
+        "blurb": "Compiled Chrome-extension bundle (Vite/CRXJS output) checked into the repo rather than gitignored.",
+        "root_paths": [
+          "dist"
+        ]
+      },
+      {
+        "id": "docs",
+        "label": "Design & Spec Docs",
+        "kind": "knowledge",
+        "files": 34,
+        "blurb": "Product/solution-design docs, PRDs, SDs, and design/testing notes (docs/design, docs/sds, docs/prds).",
+        "root_paths": [
+          "docs"
+        ]
+      },
+      {
+        "id": "icons",
+        "label": "Extension Icons",
+        "kind": "tooling",
+        "files": 3,
+        "blurb": "Static icon assets referenced by the Chrome extension manifest.",
+        "root_paths": [
+          "icons"
+        ]
+      },
+      {
+        "id": "node_modules",
+        "label": "Vendored Dependencies",
+        "kind": "tooling",
+        "files": 15434,
+        "blurb": "npm dependency tree committed directly into the repo (not gitignored at the root, unlike desktop/node_modules) — vendored, not authored code.",
+        "root_paths": [
+          "node_modules"
+        ]
+      },
+      {
+        "id": "public",
+        "label": "Public/Static Assets",
+        "kind": "tooling",
+        "files": 4,
+        "blurb": "Static files copied as-is into the extension build.",
+        "root_paths": [
+          "public"
+        ]
+      },
+      {
+        "id": "src",
+        "label": "Extension Source (Chrome MV3)",
+        "kind": "core",
+        "files": 62,
+        "blurb": "Preact/TypeScript Chrome MV3 extension: background service worker (privacy-filter, offscreen doc), content scripts injected into claude.ai/chatgpt.com (paste interception, redaction highlighting), sidepanel and popup UI, and shared/ (Zustand store, storage, redaction, message types) used across all surfaces.",
+        "root_paths": [
+          "src"
+        ]
+      },
+      {
+        "id": "tests",
+        "label": "Unit & E2E Tests",
+        "kind": "quality",
+        "files": 25,
+        "blurb": "Vitest unit tests and Playwright e2e specs for the extension source.",
+        "root_paths": [
+          "tests"
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "pr": 1,
+      "date": "2026-07-16",
+      "title": "Extension Ux Electron Port Xaywq7",
+      "tagline": "The privacy filter leaves the browser tab and moves onto the Mac clipboard.",
+      "depth": "summary",
+      "size": {
+        "files": 96,
+        "adds": 9106,
+        "dels": 25
+      },
+      "touched": {
+        "(root)": 1,
+        "desktop": 51,
+        "docs": 2,
+        "src": 5,
+        "tests": 4
+      },
+      "adrs": [
+        "ADR-0001",
+        "ADR-0002"
+      ],
+      "levels": {
+        "landscape": {
+          "narration": "This PR gives the Chrome extension's privacy filter a Mac desktop home: a new menu-bar app called SecurePII that protects the system clipboard, not just a browser tab.",
+          "detail": "96 files changed (+9106/-25): the bulk is a brand-new `desktop/` Electron app (51 files — main process, preload bridges, renderer, tests, build scripts, tray assets), plus a small extension-side change extracting `PLACEHOLDER_INSTRUCTIONS` into a shared, chrome-free module (`src/shared/paste-instruction.ts`) so both apps emit byte-identical redaction placeholders.",
+          "voice": "This change gives the privacy filter a home outside the browser. Up to now it only worked inside a Chrome extension, watching one tab at a time. This pull request adds a new Mac menu bar app called Secure P I I, built with Electron, that protects whatever you copy anywhere on the Mac — not just inside Claude dot A I or Chat G P T's web page. Ninety-six files changed, the vast majority of them the brand new desktop app."
+        },
+        "problem_solution": {
+          "narration": "The Chrome extension can only redact private information at the moment you paste into a supported website, because it works by injecting a script into that page. That means Slack, Mail, or a text editor get no protection at all. This PR adds a Mac menu bar app that watches the clipboard directly, so redaction and restoration work no matter which app you copied from or pasted into.",
+          "problem": "The extension's redaction happens in `src/content/paste-interceptor.ts`, which listens for a `paste` event inside the DOM of a supported chat site (`claude.ai`, `chatgpt.com`) and restores placeholders on a `copy` event from the same page. That interception point only exists because a content script can be injected into a web page. There is no equivalent for a native macOS app — Mail, Slack, an IDE — so nothing protects text copied outside the browser before it reaches an AI chat.",
+          "solution": "SecurePII moves the interception point from the page DOM to the system clipboard. `desktop/src/main/clipboard-monitor.ts` polls `clipboard.readText()` every 500 ms; `fingerprint.ts` cheaply detects real changes without hashing large payloads and prevents the app from reacting to its own rewrites. Each change goes through `attribution.ts` and `lsappinfo-parser.ts` to identify the frontmost app (via `org.nspasteboard.source`/`ConcealedType` markers first, `lsappinfo` as a fallback), then `exclusions.ts` and the pure decision ladder in `clipboard-decision.ts` decide whether to redact, restore, or leave the clipboard untouched. A copy from an excluded app (password managers pre-listed, plus anything marking itself concealed or transient) passes through unmodified.",
+          "voice": "Here's the concrete problem. The extension can only step in when you paste directly into a supported website, because it works by watching that page. Copy your social security number from Mail, paste it into an AI chat, and nothing catches it — Mail isn't a web page the extension can see. This pull request's fix is a clipboard monitor that polls every half second. Copy an S S N from Mail, and unless Mail is on the exclusion list, the clipboard gets rewritten within about a second to something like bracket S S N colon eight A one F two C zero four bracket — the same placeholder style the extension already uses. Paste that into Chat G P T, and an appended instruction tells the model to treat it as an opaque token, never to expand it. Copy the reply back out, and the same monitor recognizes the placeholder, looks it up in the local records store, and restores the original text.",
+          "beats": [
+            {
+              "kind": "background",
+              "text": "The Chrome extension redacts PII at the moment of a `paste` into a supported chat input (`src/content/paste-interceptor.ts`) and restores it on `copy` from the page (`copy-handler.ts`), both driven by a content script injected into `claude.ai`/`chatgpt.com`. That interception point exists only because a content script can reach into a web page's DOM — there is no equivalent hook for a native macOS app."
+            },
+            {
+              "kind": "background",
+              "text": "SecurePII, this PR's new `desktop/` Electron app, closes that gap by moving the interception point down a layer: from the page DOM to the operating system clipboard itself, the one surface every app — browser or not — shares."
+            },
+            {
+              "kind": "intuition",
+              "text": "Copy \"my SSN is 123-45-6789\" from Mail. `clipboard-monitor.ts` polls `clipboard.readText()` every 500 ms, `fingerprint.ts` recognizes the change, `attribution.ts` reads Mail's frontmost-app bundle id, and — since Mail isn't on the exclusion list — `clipboard-decision.ts` rewrites the clipboard within one poll tick to \"...[ssn:8a1f2c04]...\", the same placeholder format the extension already produces. Paste into ChatGPT and the appended instruction tells the model to echo the placeholder verbatim. Copy the reply back out and the monitor recognizes the placeholder pattern, looks `8a1f2c04` up in the local records store, and restores the real SSN — the same restore flow as the extension, just triggered by a clipboard write instead of a page's `copy` event."
+            }
+          ]
+        },
+        "architecture": {
+          "narration": "Two decisions shape this port. First, on-device inference runs inside a hidden, invisible app window rather than a faster native module, because it lets the already-hardened model-loading code from the extension be reused untouched. Second, the one piece of code both apps needed to share — the redaction instruction text — was pulled into a small shared file instead of restructuring the whole repository into a shared-package layout, keeping the desktop app's v0 scope small.",
+          "decision": "ADR-0001: reuse `privacy-filter.ts` verbatim inside a hidden, lazily-created `BrowserWindow`, talking to the main process over IPC — the desktop analogue of the extension's offscreen document. ADR-0002: extract `PLACEHOLDER_INSTRUCTIONS` into `src/shared/paste-instruction.ts`, consumed by the desktop app via a plain relative import, rather than carrying out the npm-workspaces monorepo restructure (`packages/core`, `packages/ui`, ...) proposed in SD-ELECTRON-PORT-001 §5.1.",
+          "forces": [
+            "Electron's Chromium gives a renderer navigator.gpu, Cache API, and navigator.storage.estimate(), so the extension's WebGPU-first/WASM-fallback model pipeline ports by abstracting only two chrome.* call sites.",
+            "A hidden BrowserWindow can spawn Web Workers, unlike an extension offscreen document, so WASM fallback regains multithreading as a byproduct.",
+            "src/shared/ already existed as the extension's cross-surface module, so adding one more chrome-free file there cost nothing structurally.",
+            "desktop/ ships with its own package.json, tsconfig.json, and CI, staying independently buildable rather than becoming an npm-workspace member."
+          ],
+          "alternatives": [
+            {
+              "option": "onnxruntime-node in the main process or a utilityProcess",
+              "rejected_because": "faster CPU inference, but a different runtime, a native module to notarize, and a full rewrite of the loading/caching/progress code just hardened for the extension"
+            },
+            {
+              "option": "Carry out the packages/apps npm-workspaces restructure from SD-ELECTRON-PORT-001 §5.1",
+              "rejected_because": "out of scope for a v0 port — far more invasive than the single constant this PR needed to share"
+            }
+          ],
+          "consequences": "One extra Electron process is created lazily on first redaction. The two apps remain siblings at the repo root — `src/` and `desktop/`, each independently buildable — rather than workspace members; the next piece of code both apps need to share will face the same choice again.",
+          "beats": [
+            {
+              "kind": "forces",
+              "text": "Electron's Chromium gives a renderer navigator.gpu, Cache API, and navigator.storage.estimate(), so the extension's WebGPU-first/WASM-fallback model pipeline ports by abstracting only two chrome.* call sites."
+            },
+            {
+              "kind": "forces",
+              "text": "A hidden BrowserWindow can spawn Web Workers, unlike an extension offscreen document, so WASM fallback regains multithreading as a byproduct."
+            },
+            {
+              "kind": "forces",
+              "text": "src/shared/ already existed as the extension's cross-surface module, so adding one more chrome-free file there cost nothing structurally."
+            },
+            {
+              "kind": "forces",
+              "text": "desktop/ ships with its own package.json, tsconfig.json, and CI, staying independently buildable rather than becoming an npm-workspace member."
+            },
+            {
+              "kind": "contract",
+              "text": "ADR-0001: privacy-filter.ts is reused verbatim inside a hidden, lazily-created BrowserWindow, talking to the main process over IPC. ADR-0002: PLACEHOLDER_INSTRUCTIONS moves into src/shared/paste-instruction.ts, consumed by the desktop app via a plain relative import instead of the npm-workspaces restructure SD-ELECTRON-PORT-001 §5.1 proposed."
+            },
+            {
+              "kind": "boundary",
+              "text": "One extra Electron process is created lazily on first redaction. src/ and desktop/ remain independently buildable siblings at the repo root rather than npm-workspace members; the next piece of code both apps need to share will face the same choice again."
+            }
+          ],
+          "voice": "Two design decisions carry the real weight here. The first: where should the redaction model actually run? The team chose to reuse the extension's existing model code untouched, inside a hidden, invisible app window, talking over inter-process messages. The alternative, a faster native inference module, was rejected because it would have meant a different runtime and rewriting code that had already been carefully hardened. The second decision: how much of the codebase should the two apps share? Rather than restructuring the whole repository into shared packages, the team moved just the one instruction string both apps need into a small shared file. That keeps the desktop app's first version small, at the cost of having to make the same sharing decision again next time."
+        },
+        "file_changes": {
+          "narration": "Ninety-six files land in nine natural groups: the clipboard decision pipeline, the tray/hotkeys/overlay shell, encrypted records storage, the hidden inference host, the popover UI, typed preload bridges, the extension's shared-code seam, desktop unit tests, and the desktop app's own build/packaging scripts.",
+          "groups": [
+            {
+              "title": "Clipboard decision pipeline",
+              "files": [
+                "desktop/src/main/clipboard-monitor.ts",
+                "desktop/src/main/clipboard-decision.ts",
+                "desktop/src/main/fingerprint.ts",
+                "desktop/src/main/attribution.ts",
+                "desktop/src/main/lsappinfo-parser.ts",
+                "desktop/src/main/exclusions.ts"
+              ],
+              "note": "The pure decision ladder: poll-detected clipboard changes plus frontmost-app attribution decide redact / restore / pass-through."
+            },
+            {
+              "title": "Tray, hotkeys, overlay, and app lifecycle",
+              "files": [
+                "desktop/src/main/main.ts",
+                "desktop/src/main/tray.ts",
+                "desktop/src/main/hotkeys.ts",
+                "desktop/src/main/overlay.ts",
+                "desktop/src/main/ipc.ts"
+              ],
+              "note": "The menu-bar shell: single-instance app lifecycle, tray icon/menu, global hotkeys, and the per-event overlay panel's main-process side."
+            },
+            {
+              "title": "Records persistence",
+              "files": [
+                "desktop/src/main/records-store.ts",
+                "desktop/src/main/records-crypto.ts",
+                "desktop/src/main/restore.ts"
+              ],
+              "note": "electron-store-backed records with safeStorage (Keychain) encrypted originals, and the restore lookup restore.ts drives."
+            },
+            {
+              "title": "Hidden inference host",
+              "files": [
+                "desktop/src/main/inference-host.ts",
+                "desktop/src/inference/index.ts",
+                "desktop/src/inference/privacy-filter.ts",
+                "desktop/src/inference/index.html"
+              ],
+              "note": "ADR-0001's hidden BrowserWindow, reusing the extension's model pipeline over IPC instead of chrome.runtime.sendMessage."
+            },
+            {
+              "title": "Popover renderer UI",
+              "files": [
+                "desktop/src/renderer/App.tsx",
+                "desktop/src/renderer/index.tsx",
+                "desktop/src/renderer/components/ExcludedAppsPane.tsx",
+                "desktop/src/renderer/components/ModelStatusCard.tsx",
+                "desktop/src/renderer/components/ProtectionToggle.tsx"
+              ],
+              "note": "The Preact dashboard mounted in the tray popover, reusing the extension's presentational components and onboarding flow."
+            },
+            {
+              "title": "Preload bridges and shared IPC contract",
+              "files": [
+                "desktop/src/preload/index.ts",
+                "desktop/src/preload/inference-preload.ts",
+                "desktop/src/preload/overlay-preload.ts",
+                "desktop/src/shared-ipc.ts",
+                "desktop/src/global.d.ts"
+              ],
+              "note": "Typed contextBridge surfaces per sandboxed renderer (popover, inference host, overlay), keeping nodeIntegration off everywhere."
+            },
+            {
+              "title": "Extension code-sharing seam",
+              "files": [
+                "src/shared/paste-instruction.ts",
+                "src/content/paste-interceptor.ts"
+              ],
+              "note": "ADR-0002: the placeholder-instruction constant moves to a chrome-free module; the extension re-exports it so existing imports keep working."
+            },
+            {
+              "title": "Desktop unit tests",
+              "files": [
+                "desktop/tests/clipboard-decision.test.ts",
+                "desktop/tests/exclusions.test.ts",
+                "desktop/tests/fingerprint.test.ts",
+                "desktop/tests/records-crypto.test.ts",
+                "desktop/tests/restore.test.ts",
+                "desktop/tests/lsappinfo-parser.test.ts"
+              ],
+              "note": "Covers the pure decision ladder, attribution parsing, and records crypto/restore logic added in this PR."
+            },
+            {
+              "title": "Build scripts, tray icons, and packaging config",
+              "files": [
+                "desktop/scripts/build-main.mjs",
+                "desktop/scripts/build-preload.mjs",
+                "desktop/scripts/generate-tray-icons.mjs",
+                "desktop/vite.config.ts",
+                "desktop/tsconfig.json",
+                "desktop/package.json"
+              ],
+              "note": "The desktop app's own build pipeline and CI, independent of the extension's Vite/CRXJS build."
+            }
+          ]
+        }
+      }
+    }
+  ]
+};

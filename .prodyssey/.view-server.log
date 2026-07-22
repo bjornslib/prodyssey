@@ -1,0 +1,85 @@
+Serving HTTP on 127.0.0.1 port 63775 (http://127.0.0.1:63775/) ...
+127.0.0.1 - - [21/Jul/2026 13:44:24] "GET /active/viewer/ HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 13:44:24] "GET /active/data/story.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 13:44:24] "GET /active/data/manifest.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 13:44:24] "GET /active/data/adrs.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 13:44:24] "GET /active/data/diffs-pr1.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 13:44:24] "GET /active/assets/pr-1/level-1.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 13:44:24] code 404, message File not found
+127.0.0.1 - - [21/Jul/2026 13:44:24] "GET /favicon.ico HTTP/1.1" 404 -
+127.0.0.1 - - [21/Jul/2026 13:44:40] "GET /active/data/audio/pr1_landscape.wav HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 13:44:40] code 404, message File not found
+127.0.0.1 - - [21/Jul/2026 13:44:40] "GET /favicon.ico HTTP/1.1" 404 -
+127.0.0.1 - - [21/Jul/2026 13:44:53] "GET /active/assets/pr-1/level-2.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 13:44:54] "GET /active/data/audio/pr1_problem_solution.wav HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 13:45:17] "GET /active/assets/pr-1/level-3.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 13:45:20] "GET /active/data/audio/pr1_architecture.wav HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:06:04] "GET /active/viewer/ HTTP/1.1" 304 -
+127.0.0.1 - - [21/Jul/2026 17:06:04] "GET /active/data/manifest.js HTTP/1.1" 304 -
+127.0.0.1 - - [21/Jul/2026 17:06:04] "GET /active/data/adrs.js HTTP/1.1" 304 -
+127.0.0.1 - - [21/Jul/2026 17:06:04] "GET /active/data/story.js HTTP/1.1" 304 -
+127.0.0.1 - - [21/Jul/2026 17:06:05] "GET /active/data/diffs-pr1.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:06:05] "GET /active/assets/pr-1/level-1.png HTTP/1.1" 304 -
+127.0.0.1 - - [21/Jul/2026 17:06:51] "GET /active/assets/pr-1/level-2.png HTTP/1.1" 304 -
+127.0.0.1 - - [21/Jul/2026 17:07:05] "GET /active/assets/pr-1/level-3.png HTTP/1.1" 304 -
+127.0.0.1 - - [21/Jul/2026 17:07:12] "GET /active/data/audio/pr1_landscape.wav HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:07:12] code 404, message File not found
+127.0.0.1 - - [21/Jul/2026 17:07:12] "GET /favicon.ico HTTP/1.1" 404 -
+127.0.0.1 - - [21/Jul/2026 17:07:16] "GET /active/data/audio/pr1_problem_solution.wav HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:07:18] "GET /active/data/audio/pr1_architecture.wav HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:11:14] "GET /active/viewer/ HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:11:25] "GET /active/viewer/ HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:11:25] "GET /active/assets/pr-1/level-1.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:11:26] "GET /active/viewer/ HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:11:26] "GET /active/assets/pr-1/level-1.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:13:47] "GET /active/viewer/ HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:13:47] "GET /active/assets/pr-1/level-1.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:15:36] "GET /active/data/story.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:15:36] "HEAD /active/data/story.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:16:39] "GET /active/viewer/ HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:16:39] "GET /active/assets/pr-1/level-1.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:17:12] code 404, message File not found
+127.0.0.1 - - [21/Jul/2026 17:17:12] code 404, message File not found
+127.0.0.1 - - [21/Jul/2026 17:17:12] "GET /apple-touch-icon.png HTTP/1.1" 404 -
+127.0.0.1 - - [21/Jul/2026 17:17:12] "GET /apple-touch-icon-precomposed.png HTTP/1.1" 404 -
+127.0.0.1 - - [21/Jul/2026 17:17:12] code 404, message File not found
+127.0.0.1 - - [21/Jul/2026 17:17:12] "GET /active/assets/pr-1/level-2.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:17:12] "GET /favicon.ico HTTP/1.1" 404 -
+127.0.0.1 - - [21/Jul/2026 17:17:17] code 404, message File not found
+127.0.0.1 - - [21/Jul/2026 17:17:17] "GET /apple-touch-icon-precomposed.png HTTP/1.1" 404 -
+127.0.0.1 - - [21/Jul/2026 17:17:17] code 404, message File not found
+127.0.0.1 - - [21/Jul/2026 17:17:17] "GET /apple-touch-icon.png HTTP/1.1" 404 -
+127.0.0.1 - - [21/Jul/2026 17:17:17] code 404, message File not found
+127.0.0.1 - - [21/Jul/2026 17:17:17] "GET /favicon.ico HTTP/1.1" 404 -
+127.0.0.1 - - [21/Jul/2026 17:17:17] "GET /active/assets/pr-1/level-2.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:17:33] code 404, message File not found
+127.0.0.1 - - [21/Jul/2026 17:17:34] code 404, message File not found
+127.0.0.1 - - [21/Jul/2026 17:17:34] code 404, message File not found
+127.0.0.1 - - [21/Jul/2026 17:17:34] "GET /apple-touch-icon-precomposed.png HTTP/1.1" 404 -
+127.0.0.1 - - [21/Jul/2026 17:17:34] "GET /favicon.ico HTTP/1.1" 404 -
+127.0.0.1 - - [21/Jul/2026 17:17:34] "GET /apple-touch-icon.png HTTP/1.1" 404 -
+127.0.0.1 - - [21/Jul/2026 17:17:34] "GET /active/assets/pr-1/level-2.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:17:54] "GET /active/viewer/ HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:17:54] "GET /active/data/story.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:17:54] "GET /active/data/manifest.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:17:54] "GET /active/data/adrs.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:17:55] "GET /active/data/story.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:17:55] "GET /active/data/manifest.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:17:55] "GET /active/data/diffs-pr1.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:17:55] "GET /active/data/diffs-pr1.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:17:55] "GET /active/data/adrs.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:17:55] "GET /active/assets/pr-1/level-1.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:22:28] "GET /active/data/audio/pr1_landscape.wav HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:22:28] code 404, message File not found
+127.0.0.1 - - [21/Jul/2026 17:22:28] "GET /favicon.ico HTTP/1.1" 404 -
+127.0.0.1 - - [21/Jul/2026 17:22:36] "GET /active/data/audio/pr1_problem_solution.wav HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:34:33] "GET /active/assets/pr-1/level-2.png HTTP/1.1" 304 -
+127.0.0.1 - - [21/Jul/2026 17:34:41] "GET /active/assets/pr-1/level-3.png HTTP/1.1" 304 -
+127.0.0.1 - - [21/Jul/2026 17:35:02] "GET /active/data/audio/pr1_problem_solution.wav HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:42:06] "GET /active/assets/pr-1/level-1.png HTTP/1.1" 304 -
+127.0.0.1 - - [21/Jul/2026 17:42:26] "GET /active/data/audio/pr1_problem_solution.wav HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:42:40] "GET /active/data/audio/pr1_problem_solution.wav HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:46:55] "GET /active/data/audio/pr1_problem_solution.wav HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 17:47:25] "GET /active/data/audio/pr1_problem_solution.wav HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jul/2026 18:00:52] "GET /active/assets/pr-1/level-2.png HTTP/1.1" 304 -
+127.0.0.1 - - [21/Jul/2026 18:00:54] "GET /active/data/audio/pr1_problem_solution.wav HTTP/1.1" 200 -

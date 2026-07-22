@@ -21,6 +21,14 @@ access there):
 Skill("odyssey", args="generate $ARGUMENTS")
 ```
 
+Where the bundle lands depends on what's being analyzed: self-analysis (no
+`--repo`, or `--repo` pointing at this same repo) still stores it at
+`<target>/.odyssey/` as before, while a foreign repo passed via `--repo`
+stores it instead in a central per-hub cache
+(`<hub>/.prodyssey/<repo-slug>/`) so foreign checkouts are never written
+into. Pass `--store local` or `--store central` to override that automatic
+choice.
+
 ## Default PR selection
 
 If the user doesn't pass `--prs`, `--latest`, or a range (`N..M`), the skill
