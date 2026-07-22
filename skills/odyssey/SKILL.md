@@ -184,6 +184,18 @@ Per-PR narrative + ADR + art + audio sweep. Steps:
    `--latest`). Otherwise let `extract_story.py`'s discovery surface the most
    recent PRs (merge commits → squash `(#N)` → `gh` fallback) and confirm the last
    10 with the user before proceeding.
+
+   `--prs N` can resolve to either a merged commit or a currently-open PR (the
+   `gh` fallback checks `mergedAt`/`mergeCommit` and, if both are empty, treats
+   N as open — diffing against the local merge-base of its head and base
+   branches instead of a merge/squash commit). Open-PR entries are tagged
+   `"status": "open"` in `story.json` and reflect the PR's diff as of
+   generation time, not settled history: re-running generate mode with `--force`
+   for that PR after new commits land on its branch refreshes the
+   size/touched/diff/narrative for the new tip, rather than treating the
+   original snapshot as immutable the way a merged PR's is.
+
+
 3. **Per PR**, run the resumability check first and only execute stages whose
    artifacts are missing (or all stages if `--force`):
    ```bash

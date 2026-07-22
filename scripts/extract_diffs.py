@@ -5,12 +5,18 @@
 # ///
 """Extract per-PR unified diffs into <bundle-dir>/data/diffs-pr{N}.js.
 
-For each requested PR, resolves its merge/squash commit (same discovery chain
-as extract_story.py — merge-commit scan, squash-commit scan, gh CLI fallback;
-duplicated here so this script is standalone-runnable with no cross-imports),
-then computes the diff:
+For each requested PR, resolves its merge/squash commit, or — if the PR is
+still open (no merge commit yet) — its head commit and local merge-base
+(same discovery chain as extract_story.py — merge-commit scan, squash-commit
+scan, gh CLI fallback with an open-PR path; duplicated here so this script is
+standalone-runnable with no cross-imports), then computes the diff:
   - merge commit: `git diff <parent1>..<parent2>`
   - squash commit: `git diff <sha>^..<sha>`
+  - open PR:       `git diff <merge-base>..<head>`
+
+Open-PR diffs reflect the branch's current tip as of the run — re-running
+after new commits land on that branch (and passing `--force`) refreshes the
+diff rather than treating it as immutable history the way merged PRs are.
 
 The diff is split per file (on `diff --git a/... b/...` boundaries), each
 file's diff capped at 4000 lines with a truncation marker, and written as a
@@ -134,9 +140,27 @@ def discover_squash_prs(repo: Path, rev: str) -> list[dict]:
     return prs
 
 
+def compute_merge_base(repo: Path, base_ref: str, head_ref: str) -> str | None:
+    """Local merge-base of a PR's base branch and head commit. Falls back to
+    `origin/<base_ref>` when the bare branch name doesn't resolve locally
+    (e.g. an open PR from a fork, or a base branch not fetched under that
+    exact local name)."""
+    try:
+        return run_git(repo, ["merge-base", base_ref, head_ref]).strip()
+    except subprocess.CalledProcessError:
+        pass
+    try:
+        return run_git(repo, ["merge-base", f"origin/{base_ref}", head_ref]).strip()
+    except subprocess.CalledProcessError:
+        return None
+
+
 def try_gh_pr(repo: Path, pr_num: int) -> dict | None:
     origin = get_remote_origin(repo)
-    cmd = ["gh", "pr", "view", str(pr_num), "--json", "mergeCommit,title,mergedAt"]
+    cmd = [
+        "gh", "pr", "view", str(pr_num), "--json",
+        "mergeCommit,title,mergedAt,headRefOid,baseRefName",
+    ]
     if origin:
         cmd += ["--repo", origin]
     try:
@@ -147,10 +171,26 @@ def try_gh_pr(repo: Path, pr_num: int) -> dict | None:
         data = json.loads(out)
     except json.JSONDecodeError:
         return None
+
     merge_commit = (data.get("mergeCommit") or {}).get("oid")
-    if not merge_commit:
+    merged_at = data.get("mergedAt") or ""
+
+    if merge_commit:
+        return {"hash": merge_commit, "pr": pr_num, "kind": commit_kind(repo, merge_commit)}
+
+    if merged_at:
+        # Reported merged but no merge commit oid — unexpected shape, don't guess.
         return None
-    return {"hash": merge_commit, "pr": pr_num, "kind": commit_kind(repo, merge_commit)}
+
+    # No merge commit and not merged: this PR is still open.
+    head_ref = data.get("headRefOid")
+    base_ref = data.get("baseRefName")
+    if not head_ref or not base_ref:
+        return None
+    merge_base = compute_merge_base(repo, base_ref, head_ref)
+    if not merge_base:
+        return None
+    return {"hash": head_ref, "pr": pr_num, "kind": "open", "diff_base": merge_base}
 
 
 def resolve_prs(repo: Path, pr_nums: list[int], dot_range: str | None) -> dict[int, dict]:
@@ -208,6 +248,8 @@ def get_diff_text(repo: Path, entry: dict) -> str:
         parts = run_git(repo, ["rev-list", "--parents", "-n", "1", sha]).strip().split()
         parent1, parent2 = parts[1], parts[2]
         return run_git(repo, ["diff", f"{parent1}..{parent2}"])
+    if entry["kind"] == "open":
+        return run_git(repo, ["diff", f"{entry['diff_base']}..{sha}"])
     return run_git(repo, ["diff", f"{sha}^..{sha}"])
 
 
