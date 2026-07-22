@@ -1,0 +1,7 @@
+# Copied fixture bundle data (duplicated from the gitignored .prodyssey/ test
+# bundle). Not committed — it's ~21MB of binary scene-art/audio. To re-run
+# render-test.mjs, copy a real bundle's data/ and assets/ into bundle/ (see
+# FINDINGS.md). The refactored bundle/viewer/ IS kept — it's the deliverable.
+bundle/data/
+bundle/assets/
+bundle/inventory.yaml
