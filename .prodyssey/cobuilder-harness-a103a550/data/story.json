@@ -1,0 +1,377 @@
+{
+  "meta": {
+    "repo": "cobuilder-harness",
+    "generated": "2026-07-21",
+    "schema_version": "1.0",
+    "title": "cobuilder-harness — Codebase Odyssey",
+    "description": "",
+    "levels": [
+      "PR Landscape",
+      "Problem & Solution",
+      "Architecture",
+      "File Changes"
+    ]
+  },
+  "world": {
+    "districts": [
+      {
+        "id": ".agents",
+        "label": ".agents",
+        "kind": "unknown",
+        "files": 228,
+        "blurb": ""
+      },
+      {
+        "id": ".beads",
+        "label": ".beads",
+        "kind": "unknown",
+        "files": 14,
+        "blurb": ""
+      },
+      {
+        "id": ".claude",
+        "label": ".claude",
+        "kind": "unknown",
+        "files": 702,
+        "blurb": ""
+      },
+      {
+        "id": ".cobuilder",
+        "label": ".cobuilder",
+        "kind": "unknown",
+        "files": 42,
+        "blurb": ""
+      },
+      {
+        "id": ".github",
+        "label": ".github",
+        "kind": "unknown",
+        "files": 4,
+        "blurb": ""
+      },
+      {
+        "id": ".pi",
+        "label": ".pi",
+        "kind": "unknown",
+        "files": 8,
+        "blurb": ""
+      },
+      {
+        "id": ".pipelines",
+        "label": ".pipelines",
+        "kind": "unknown",
+        "files": 4,
+        "blurb": ""
+      },
+      {
+        "id": ".repomap",
+        "label": ".repomap",
+        "kind": "unknown",
+        "files": 6,
+        "blurb": ""
+      },
+      {
+        "id": ".taskmaster",
+        "label": ".taskmaster",
+        "kind": "unknown",
+        "files": 32,
+        "blurb": ""
+      },
+      {
+        "id": "acceptance-tests",
+        "label": "acceptance-tests",
+        "kind": "unknown",
+        "files": 16,
+        "blurb": ""
+      },
+      {
+        "id": "cobuilder",
+        "label": "cobuilder",
+        "kind": "unknown",
+        "files": 356,
+        "blurb": ""
+      },
+      {
+        "id": "cobuilder-frontend",
+        "label": "cobuilder-frontend",
+        "kind": "unknown",
+        "files": 37,
+        "blurb": ""
+      },
+      {
+        "id": "docs",
+        "label": "docs",
+        "kind": "unknown",
+        "files": 273,
+        "blurb": ""
+      },
+      {
+        "id": "examples",
+        "label": "examples",
+        "kind": "unknown",
+        "files": 8,
+        "blurb": ""
+      },
+      {
+        "id": "reports",
+        "label": "reports",
+        "kind": "unknown",
+        "files": 4,
+        "blurb": ""
+      },
+      {
+        "id": "stagehand-crawl-cli",
+        "label": "stagehand-crawl-cli",
+        "kind": "unknown",
+        "files": 17,
+        "blurb": ""
+      },
+      {
+        "id": "state",
+        "label": "state",
+        "kind": "unknown",
+        "files": 12,
+        "blurb": ""
+      },
+      {
+        "id": "tests",
+        "label": "tests",
+        "kind": "unknown",
+        "files": 356,
+        "blurb": ""
+      },
+      {
+        "id": "tools",
+        "label": "tools",
+        "kind": "unknown",
+        "files": 14,
+        "blurb": ""
+      },
+      {
+        "id": "utils",
+        "label": "utils",
+        "kind": "unknown",
+        "files": 25,
+        "blurb": ""
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "pr": 60,
+      "date": "2026-04-25",
+      "title": "Review Cobuilder Architecture Su6Vt",
+      "tagline": "",
+      "depth": "summary",
+      "size": {
+        "files": 2,
+        "adds": 25,
+        "dels": 6
+      },
+      "touched": {
+        ".claude": 2
+      },
+      "levels": {}
+    },
+    {
+      "pr": 61,
+      "date": "2026-05-21",
+      "title": "Epic A Refactor",
+      "tagline": "",
+      "depth": "summary",
+      "size": {
+        "files": 6,
+        "adds": 2337,
+        "dels": 2459
+      },
+      "touched": {
+        "cobuilder": 4,
+        "tests": 2
+      },
+      "levels": {}
+    },
+    {
+      "pr": 62,
+      "date": "2026-05-21",
+      "title": "Gastown Migration",
+      "tagline": "",
+      "depth": "summary",
+      "size": {
+        "files": 101,
+        "adds": 25372,
+        "dels": 1486
+      },
+      "touched": {
+        ".agents": 7,
+        ".beads": 13,
+        ".claude": 9,
+        "(root)": 9,
+        ".pi": 1,
+        ".pipelines": 4,
+        "acceptance-tests": 10,
+        "agents": 3,
+        "cobuilder": 6,
+        "daemon": 1,
+        "docs": 25,
+        "formulas": 6,
+        "state": 3,
+        "tests": 4
+      },
+      "levels": {}
+    },
+    {
+      "pr": 63,
+      "date": "2026-05-21",
+      "title": "Gastown Migration",
+      "tagline": "",
+      "depth": "summary",
+      "size": {
+        "files": 265,
+        "adds": 28238,
+        "dels": 23435
+      },
+      "touched": {
+        ".agents": 31,
+        ".beads": 2,
+        ".claude": 196,
+        ".pi": 1,
+        "acceptance-tests": 2,
+        "agents": 3,
+        "(root)": 2,
+        "cobuilder": 11,
+        "daemon": 1,
+        "docs": 3,
+        "formulas": 6,
+        "tests": 7
+      },
+      "levels": {}
+    },
+    {
+      "pr": 64,
+      "date": "2026-05-29",
+      "title": "Cobuilder Refactoring May 26",
+      "tagline": "",
+      "depth": "summary",
+      "size": {
+        "files": 488,
+        "adds": 23749,
+        "dels": 14184
+      },
+      "touched": {
+        ".agents": 1,
+        ".beads": 2,
+        ".claude-plugin": 1,
+        ".claude": 42,
+        ".cobuilder": 12,
+        ".pipelines": 3,
+        ".taskmaster": 1,
+        "(root)": 13,
+        "acceptance-tests": 4,
+        "cobuilder": 190,
+        "docs": 50,
+        "examples": 8,
+        "stagehand-crawl-cli": 17,
+        "state": 1,
+        "tests": 142,
+        "tools": 1
+      },
+      "levels": {}
+    },
+    {
+      "pr": 65,
+      "date": "2026-06-02",
+      "title": "Pensive Goldberg Reqia",
+      "tagline": "",
+      "depth": "summary",
+      "size": {
+        "files": 7,
+        "adds": 388,
+        "dels": 19
+      },
+      "touched": {
+        ".claude": 6,
+        "docs": 1
+      },
+      "levels": {}
+    },
+    {
+      "pr": 66,
+      "date": "2026-06-08",
+      "title": "Pipeline Watch P3",
+      "tagline": "",
+      "depth": "summary",
+      "size": {
+        "files": 33,
+        "adds": 11117,
+        "dels": 52
+      },
+      "touched": {
+        ".cobuilder": 2,
+        "cobuilder": 17,
+        "docs": 12,
+        "tests": 2
+      },
+      "levels": {}
+    },
+    {
+      "pr": 68,
+      "date": "2026-06-16",
+      "title": "Guardian Pi Phase3",
+      "tagline": "",
+      "depth": "summary",
+      "size": {
+        "files": 93,
+        "adds": 14623,
+        "dels": 3038
+      },
+      "touched": {
+        ".beads": 1,
+        ".claude": 10,
+        ".pi": 5,
+        "(root)": 4,
+        "cobuilder": 37,
+        "docs": 21,
+        "tests": 15
+      },
+      "levels": {}
+    },
+    {
+      "pr": 70,
+      "date": "2026-06-23",
+      "title": "Cobuilder Frontend Epic1 Registry",
+      "tagline": "",
+      "depth": "summary",
+      "size": {
+        "files": 12796,
+        "adds": 7168,
+        "dels": 4407061
+      },
+      "touched": {
+        ".beads": 1,
+        "(root)": 1,
+        "acceptance-tests": 4,
+        "cobuilder-frontend": 37,
+        "cobuilder": 10,
+        "docs": 9,
+        "tests": 6
+      },
+      "levels": {}
+    },
+    {
+      "pr": 71,
+      "date": "2026-06-30",
+      "title": "Frontend Step Outcome Linebreaks List Hover Light",
+      "tagline": "",
+      "depth": "summary",
+      "size": {
+        "files": 3,
+        "adds": 42,
+        "dels": 20
+      },
+      "touched": {
+        "cobuilder-frontend": 3
+      },
+      "levels": {}
+    }
+  ]
+}

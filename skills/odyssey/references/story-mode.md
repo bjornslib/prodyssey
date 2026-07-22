@@ -29,8 +29,8 @@ bundle's four-level schema — see §2. The quiz is not implemented (§5).
 | Level | Schema key | Fed by |
 |---|---|---|
 | 1 | `landscape` | One-line hook (tagline register) + mechanical summary of size/touched dirs |
-| 2 | `problem_solution` | **Background** (deep → narrow) + **Intuition** (essence, concrete toy data, before/after) |
-| 3 | `architecture` | Design narrative: forces → decision → alternatives-with-rejections → consequences/boundaries → what it enables (drawn from the PR's ADRs) |
+| 2 | `problem_solution` | **Background** (deep → narrow) + **Intuition** (essence, concrete toy data, before/after) — written into the `beats` array, see §2a |
+| 3 | `architecture` | Design narrative: forces → decision → alternatives-with-rejections → consequences/boundaries → what it enables (drawn from the PR's ADRs) — forces/contract/boundary written into the `beats` array, see §2a |
 | 4 | `file_changes` | **Code** section: grouped walkthrough, each group is "why these files belong together," grounded in `git diff --name-only` |
 
 Level 1 is the entry a PM sees first in the timeline scrubber — keep it to a
@@ -59,6 +59,52 @@ alternatives to fill the field. That statement satisfies both this
 reference's "only when it carries weight" discipline and `verify_bundle.py`'s
 unconditional non-empty check — it is the correct content for a decision-free
 PR, not a workaround.
+
+## 2a. The `beats` array (mandatory) — this is what the viewer's cards read
+
+The bundle viewer does **not** read `problem`, `solution`, `forces`,
+`decision`, or `consequences` for its Background / Intuition / Forces /
+Contract / Boundary cards. Those fields feed other cards on the same screen
+(The Problem / The Solution on level 2; the ADR sheet's own Forces/Decision
+on level 3, opened by clicking an ADR badge). The beat cards themselves read
+one field: `levels.<level>.beats`, present on **both** `problem_solution`
+and `architecture`, an array of:
+
+```json
+{"kind": "<kind>", "text": "<prose>"}
+```
+
+`kind` routes the item to a card and picks its on-screen label — the string
+must match exactly, or the item renders under the wrong heading (or is
+silently dropped):
+
+| Level | Valid `kind` values | Renders as |
+|---|---|---|
+| `problem_solution` | `background`, `intuition` | Background card, Intuition card |
+| `architecture` | `forces`, `contract`, `boundary` | Forces card(s), Contract card, Boundary card |
+
+Skip `beats` and the viewer shows literal placeholder text — "No background
+evidence recorded.", "No architecture beats recorded for this PR." — even
+when `problem`/`solution`/`forces`/`decision` are fully written. **Write
+`beats` every time you write a level 2 or level 3 entry; it is a required
+field in its own right, not optional decoration layered on `problem`/
+`solution`/`forces`:**
+
+- **Level 2 `beats`**: at least one `background` item (the deep→narrow
+  system context from §3) and at least one `intuition` item (the concrete
+  toy example from §3). This is the same content you're already putting in
+  `problem`/`solution` — write it again as discrete beat entries. Multiple
+  `background` items are fine (one per context layer); one strong
+  `intuition` item is usually enough.
+- **Level 3 `beats`**: one `forces` item per entry in the `forces` array
+  (pulled from the ADR per §2), one `contract` item stating the decision(s)
+  made, and one `boundary` item stating the consequences / what the decision
+  enables. A PR with zero ADRs still needs a `beats` array — a single
+  `boundary` item carrying the null-decision statement from §2 satisfies it.
+
+Register: `beats` text is developer-precise (the `detail`-register rules in
+§4 — code identifiers in backticks, exact numbers), matching `problem`/
+`solution`/`forces`, never the PM-plain `narration` register.
 
 ## 3. Style rules (mandatory)
 
@@ -92,10 +138,10 @@ PR, not a workaround.
 
 - **`narration` fields** (all levels): plain language, PM-readable. No code
   identifiers, no file paths, no acronyms without a one-clause gloss.
-- **`detail` / `problem` / `solution` fields** (levels 1, 2, 4): precise,
-  developer-readable. Code identifiers in backticks (`` `DagOrchestrator` ``,
-  `` `worker-done.ts` ``), exact numbers, exact paths where the level allows
-  paths (4 only).
+- **`detail` / `problem` / `solution` / `beats[].text` fields** (levels 1, 2,
+  3, 4): precise, developer-readable. Code identifiers in backticks
+  (`` `DagOrchestrator` ``, `` `worker-done.ts` ``), exact numbers, exact
+  paths where the level allows paths (4 only).
 - Every level entry that has both a `narration` and a detail-register field
   must say the same thing at two altitudes — never split content between
   them (e.g. don't put a fact only in `detail` that `narration` needs to make

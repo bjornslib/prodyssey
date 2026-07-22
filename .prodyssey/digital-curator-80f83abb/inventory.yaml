@@ -1,0 +1,43 @@
+generated: 2026-07-21
+provenance: inferred
+contexts:
+  - id: .beads
+    label: Beads Tracker State
+    paths: [.beads]
+    summary: Local Dolt/beads issue-tracker database (backups, credential key) committed in-repo for task tracking — not application code.
+  - id: acceptance-tests
+    label: Acceptance Tests
+    paths: [acceptance-tests]
+    summary: Standalone acceptance-test suite separate from the unit/e2e tests under tests/.
+  - id: desktop
+    label: SecurePII Desktop (Electron)
+    paths: [desktop]
+    summary: Electron macOS menu-bar port ("SecurePII") of the extension's redaction engine — main/preload/renderer/overlay/inference processes, own package.json and build scripts, redacts clipboard content before it reaches an AI chat.
+  - id: dist
+    label: Extension Build Output
+    paths: [dist]
+    summary: Compiled Chrome-extension bundle (Vite/CRXJS output) checked into the repo rather than gitignored.
+  - id: docs
+    label: Design & Spec Docs
+    paths: [docs]
+    summary: Product/solution-design docs, PRDs, SDs, and design/testing notes (docs/design, docs/sds, docs/prds).
+  - id: icons
+    label: Extension Icons
+    paths: [icons]
+    summary: Static icon assets referenced by the Chrome extension manifest.
+  - id: node_modules
+    label: Vendored Dependencies
+    paths: [node_modules]
+    summary: npm dependency tree committed directly into the repo (not gitignored at the root, unlike desktop/node_modules) — vendored, not authored code.
+  - id: public
+    label: Public/Static Assets
+    paths: [public]
+    summary: Static files copied as-is into the extension build.
+  - id: src
+    label: Extension Source (Chrome MV3)
+    paths: [src]
+    summary: Preact/TypeScript Chrome MV3 extension — background service worker, content scripts for claude.ai/chatgpt.com, sidepanel and popup UI, and shared Zustand store/redaction/messaging code.
+  - id: tests
+    label: Unit & E2E Tests
+    paths: [tests]
+    summary: Vitest unit tests and Playwright e2e specs for the extension source.

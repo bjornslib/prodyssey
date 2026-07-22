@@ -92,16 +92,20 @@ You don't have to open a session inside the repo you want a story for —
 /prodyssey:baseline --repo ~/code/other-project
 ```
 
-The bundle lands in that repo's `.odyssey/`, and `GEMINI_API_KEY` is looked up
-in that repo's `.env` (or your environment). If Claude lacks read access to the
-path, grant it once with `/add-dir ~/code/other-project`.
+`GEMINI_API_KEY` is looked up in that repo's `.env` (or your environment). If
+Claude lacks read access to the path, grant it once with
+`/add-dir ~/code/other-project`. The bundle itself does **not** land inside
+that repo — see [Multiple repos](#multiple-repos) below for where it goes.
 
 ---
 
 ## Output: the bundle
 
-Everything lands in `.odyssey/` in the target repo — a **portable, versioned
-bundle** any Odyssey viewer renders:
+For self-analysis (the common case: no `--repo`, or `--repo` pointing at the
+repo you're already in) everything lands in `.odyssey/` in that repo — a
+**portable, versioned bundle** any Odyssey viewer renders. Analyzing a
+*different* repo via `--repo` stores the same tree elsewhere instead — see
+[Multiple repos](#multiple-repos) below.
 
 ```
 <target>/.odyssey/
@@ -203,11 +207,40 @@ target repo travels at all.
 
 ## Viewing the result
 
-- **Bundled viewer**: `python3 -m http.server` in `.odyssey/viewer/`, point it
-  at the bundle (`?bundle=<path-or-url>`).
+- **Bundled viewer**: `/prodyssey:view` starts one long-lived
+  `python3 -m http.server` per hub in the background and prints a URL —
+  the session keeps going while it runs. It discovers every bundle you've
+  generated (see [Multiple repos](#multiple-repos)) and points an internal
+  `active` symlink at whichever one you're viewing, so switching bundles
+  later never restarts the server or changes the port — just refresh the
+  browser tab. `/prodyssey:view --stop` shuts it down.
+  (Manual equivalent for a single bundle: `cd .odyssey && python3 -m http.server`,
+  then open `http://localhost:8000/viewer/` — the server must be rooted at
+  the bundle's *parent* directory, not `viewer/` itself, since
+  `viewer/index.html` loads sibling files like `../data/story.js`.)
 - **Production app** (future): sign in → *Import bundle* → upload `.odyssey/`
   or paste the raw GitHub URL of a committed bundle. Review workflow (approve /
   request changes / per-level comments) works on imported stories.
+
+## Multiple repos
+
+Analyzing your own repo (no `--repo`) is unchanged — the bundle still lands
+at `.odyssey/`, portable and committable. Point `--repo <path>` at a
+*different* local checkout and Prodyssey writes nothing into that repo at
+all: the bundle is cached locally instead, under the hub's (the repo you're
+running Claude Code from) `.prodyssey/` directory, scoped to that target repo.
+This makes it safe to generate stories for repos you don't own or don't want
+to touch. A `--store local|central` flag forces either location if the
+automatic choice isn't what you want.
+
+```
+/prodyssey:generate --repo ~/code/other-project --prs 42,43
+```
+
+`/prodyssey:view` discovers every bundle a hub has (its own `.odyssey/` plus
+anything cached in `.prodyssey/`); with more than one it lists them and asks
+which to view, `/prodyssey:view --list` shows what's stored, and switching
+between them doesn't restart the server — it just repoints what's served.
 
 ## Cost
 
