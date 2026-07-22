@@ -116,9 +116,10 @@ per the transform above.
 
 `story.json`'s `meta.schema_version` is currently `"1.0"` —
 `verify_bundle.py` gates on it (`SCHEMA_VERSION_KNOWN`). `.odyssey/` is
-gitignored in *this* repo (it's test-bundle output against prodyssey
-itself, not a shipped artifact) but is meant to be committed in target
-repos that adopt the plugin.
+committed in *this* repo (not gitignored) — the team deliberately tracks
+prodyssey's own generated bundles so engineers can review each other's PRs
+as an odyssey instead of only a raw diff, same as it's meant to be committed
+in target repos that adopt the plugin.
 
 ## Conventions worth preserving
 

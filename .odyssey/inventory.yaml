@@ -1,0 +1,19 @@
+generated: 2026-07-22
+provenance: inferred
+contexts:
+  - id: .prodyssey
+    label: Central Bundle Cache
+    paths: [.prodyssey]
+    summary: Hub-local scratch for centrally-stored bundles and view-server bookkeeping — currently holds prior test-run bundles committed to git rather than gitignored.
+  - id: commands
+    label: Slash Commands
+    paths: [commands]
+    summary: Thin dispatchers (baseline.md, generate.md, view.md) forwarding args into the odyssey skill.
+  - id: scripts
+    label: Generation Scripts
+    paths: [scripts]
+    summary: PEP 723 uv scripts for mechanical data movement — extract_story, extract_diffs, generate_prompts, generate_audio, verify_bundle.
+  - id: skills
+    label: Odyssey Skill
+    paths: [skills]
+    summary: SKILL.md orchestration plus on-demand reference docs holding the judgment-shaped guidance (story-mode, decision-records-lite, baseline-derivation, adr-template, stack cards).
