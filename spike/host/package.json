@@ -1,0 +1,50 @@
+{
+  "name": "prodyssey-host-spike",
+  "displayName": "Prodyssey (spike)",
+  "description": "Spike: VS Code extension host embedding the Claude Agent SDK to drive the bundled Prodyssey odyssey skill.",
+  "version": "0.0.1",
+  "private": true,
+  "publisher": "prodyssey-spike",
+  "engines": {
+    "vscode": "^1.125.0",
+    "node": ">=18.0.0"
+  },
+  "categories": ["Other"],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onCommand:prodyssey.generate",
+    "onCommand:prodyssey.baseline",
+    "onCommand:prodyssey.view"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "prodyssey.generate",
+        "title": "Prodyssey: Generate"
+      },
+      {
+        "command": "prodyssey.baseline",
+        "title": "Prodyssey: Baseline"
+      },
+      {
+        "command": "prodyssey.view",
+        "title": "Prodyssey: View Story"
+      }
+    ]
+  },
+  "scripts": {
+    "copy-plugin": "node scripts/copy-plugin.mjs",
+    "compile": "node esbuild.config.mjs",
+    "package": "npm run copy-plugin && npm run compile && npx @vscode/vsce package --allow-missing-repository --no-dependencies -o dist/prodyssey-host-spike.vsix"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.218"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@types/vscode": "^1.125.0",
+    "@vscode/vsce": "^3.9.2",
+    "esbuild": "^0.28.1",
+    "typescript": "^7.0.2"
+  }
+}
