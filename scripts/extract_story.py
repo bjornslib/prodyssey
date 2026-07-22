@@ -29,6 +29,12 @@ PR discovery is a fallback chain:
       tip — open-PR entries are not treated as immutable history the way
       merged entries are.
 
+Every timeline entry also carries `"commit"`: the merge-commit SHA for a
+merged PR (permanent), or the branch-head SHA as of generation time for an
+open one (expected to move on later re-runs) — a stable per-PR reference
+for downstream consumers (e.g. the publish pipeline's staleness check) that
+this script already computed internally but didn't use to persist.
+
 Usage:
     uv run extract_story.py --repo <path> --dry-run
     uv run extract_story.py --repo <path>
@@ -501,6 +507,7 @@ def build_new_story(repo: Path, existing: dict, dot_range: str | None, prs_filte
             entry["size"] = size
             entry["touched"] = touched
             entry["status"] = status
+            entry["commit"] = pr_info["hash"]
         else:
             entry = {
                 "pr": pr_num,
@@ -512,6 +519,7 @@ def build_new_story(repo: Path, existing: dict, dot_range: str | None, prs_filte
                 "touched": touched,
                 "levels": {},
                 "status": status,
+                "commit": pr_info["hash"],
             }
         new_timeline.append(entry)
 

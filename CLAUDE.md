@@ -24,16 +24,22 @@ know that aren't obvious from reading the files.
 
 ```
 .claude-plugin/       plugin.json (manifest) + marketplace.json
-commands/              thin dispatchers: baseline.md, generate.md → Skill("odyssey", args=...)
+commands/              thin dispatchers: baseline.md, generate.md, view.md,
+                       publish.md → Skill("odyssey", args=...)
 skills/odyssey/
-  SKILL.md            orchestration: prereq gate → baseline → per-PR sweep → verify
+  SKILL.md            orchestration: prereq gate → baseline → per-PR sweep →
+                       view → publish → verify
   references/         loaded on demand (story-mode, decision-records-lite,
                        baseline-derivation, adr-template, stacks/*)
-  scripts/            5 PEP-723 uv scripts, called by the skill, never edited by it:
+scripts/               8 PEP-723 uv scripts, called by the skill, never edited by it:
                        extract_story.py, generate_prompts.py, generate_audio.py,
-                       extract_diffs.py, verify_bundle.py
+                       extract_diffs.py, verify_bundle.py, export_artifact.py,
+                       export_index.py, record_publish.py
 viewer/index.html      the bundle viewer (~2000 lines, single file, see below)
 ```
+
+(`scripts/` is top-level, a sibling of `skills/`, not nested under
+`skills/odyssey/` — `SKILL.md` calls it via `${CLAUDE_PLUGIN_ROOT}/scripts/...`.)
 
 `skills/` and `commands/` are auto-discovered — the manifest doesn't
 declare them.
@@ -97,11 +103,22 @@ knowing if this gets revisited:
   again as base64. An artifact-export mode would need to either drop audio,
   transcode to a compressed format, or cap it to one PR/level at a time.
 
-No such export mode exists in this repo yet — the experiment above was
-scratch work to answer the feasibility question, not a shipped feature.
-If someone asks for it, the shape is: a new script (or a flag on an existing
-one) that reads a built `.odyssey/` bundle and emits one flattened HTML file
-per the transform above.
+That experiment is now a real, shipped mode: `/prodyssey:publish` (Publish
+mode in `SKILL.md`). `scripts/export_artifact.py` does exactly the transform
+above per PR (plus a compression-tier retry loop if the result would exceed
+the budget, dropping audio as a last resort); `scripts/export_index.py`
+renders a small standalone landing page (no images/audio, so no budget
+concerns) linking to every PR artifact published so far for the bundle;
+`scripts/record_publish.py` writes the Artifact tool's returned URL back into
+`<bundle-dir>/exports/publish-manifest.json` once Claude has it — the only
+piece of the pipeline that has to run after the actual publish call, since no
+script can know the URL in advance. `publish-manifest.json` is also the
+staleness record: a content hash plus (when available) the PR's commit SHA,
+so re-running `/prodyssey:publish` on an unchanged PR reports "already up to
+date" instead of re-publishing.
+
+`--format artifact` is the only implemented target; `--format notion` is a
+recognized, reserved flag value with no implementation behind it yet.
 
 ## Bundle output shape (what generation produces)
 
@@ -112,7 +129,11 @@ per the transform above.
   assets/pr-{N}/level-{1..3}.png
   inventory.yaml
   viewer/index.html
+  exports/{publish-manifest.json, pr-{N}.html…, index.html}   # written by /prodyssey:publish
 ```
+
+`exports/` only appears once `/prodyssey:publish` has run at least once; it's
+as committable as the rest of the bundle — see Publish mode notes below.
 
 `story.json`'s `meta.schema_version` is currently `"1.0"` —
 `verify_bundle.py` gates on it (`SCHEMA_VERSION_KNOWN`). `.odyssey/` is
