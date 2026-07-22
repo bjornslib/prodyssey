@@ -4,20 +4,20 @@
   "prs": {
     "2": {
       "title": "docs: add CLAUDE.md with codebase orientation + artifact feasibility findings",
-      "tagline": "This PR proposes a single orientation doc so future sessions stop re-deriving the same layout and feasibility findings from scratch.",
+      "tagline": "This PR proposes an orientation doc, plus a full pipeline that turns any generated PR narrative into a shareable Claude Artifact.",
       "status": "open",
-      "commit": null,
-      "source_hash": "7e45ba3796b1f2b4",
+      "commit": "70f51543af31cc77e1a5505a8225ba5a6c07b53e",
+      "source_hash": "3ab553dcca9a3fbc",
       "export_file": "exports/pr-2.html",
-      "export_bytes": 3271091,
-      "exported_at": "2026-07-22T09:29:42Z",
+      "export_bytes": 3494348,
+      "exported_at": "2026-07-22T09:56:08Z",
       "date": "2026-07-22",
       "artifact_url": "https://claude.ai/code/artifact/ea2c0f34-c5e5-46f7-b619-2bb7c72b5583",
-      "published_at": "2026-07-22T09:30:07Z"
+      "published_at": "2026-07-22T09:56:34Z"
     }
   },
   "index": {
     "artifact_url": "https://claude.ai/code/artifact/4bf5fff8-f70e-4e68-8553-2b8a254c5e79",
-    "published_at": "2026-07-22T09:30:18Z"
+    "published_at": "2026-07-22T09:56:48Z"
   }
 }
