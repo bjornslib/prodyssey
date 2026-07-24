@@ -38,11 +38,17 @@ from pathlib import Path
 
 SCHEMA_VERSION = "1.0"
 MAX_LINES_PER_FILE = 4000
+MAX_BYTES_PER_FILE = 200_000  # belt-and-suspenders: some files (minified JS, a
+# single-line JSON blob, a data-URI-heavy HTML export) pack megabytes onto a
+# handful of lines, so the line cap alone doesn't bound them.
 TRUNCATION_MARKER = "\n… [truncated by prodyssey: diff exceeds 4000 lines]"
+BYTE_TRUNCATION_MARKER = "\n… [truncated by prodyssey: diff exceeds 200KB on very few lines]"
+GENERATED_EXPORT_NOTE = "[not diffed by prodyssey: this is a previously-published bundle export, not source — its content is a base64-heavy self-contained HTML file, and diffing it against itself on every regenerate would balloon future diffs without adding anything narratively useful]"
 
 MERGE_PR_RE = re.compile(r"Merge pull request #(\d+) from \S+?/(\S+)")
 SQUASH_PR_RE = re.compile(r"\(#(\d+)\)\s*$")
 DIFF_GIT_RE = re.compile(r"^diff --git a/(.+?) b/(.+)$")
+GENERATED_EXPORT_RE = re.compile(r"(^|/)exports/[^/]+\.html$")
 
 
 # ---- PR resolution (duplicated from extract_story.py — no cross-imports) ----
@@ -271,10 +277,19 @@ def split_diff_by_file(diff_text: str) -> dict[str, str]:
 
     result = {}
     for path, file_lines in files.items():
+        if GENERATED_EXPORT_RE.search(path):
+            result[path] = file_lines[0] + "\n" + GENERATED_EXPORT_NOTE
+            continue
         if len(file_lines) > MAX_LINES_PER_FILE:
             text = "\n".join(file_lines[:MAX_LINES_PER_FILE]) + TRUNCATION_MARKER
         else:
             text = "\n".join(file_lines)
+        if len(text.encode()) > MAX_BYTES_PER_FILE:
+            # Truncate on a character boundary near the byte cap, not a line
+            # boundary — a single oversized line is exactly the case this
+            # guards against.
+            encoded = text.encode()[:MAX_BYTES_PER_FILE]
+            text = encoded.decode(errors="ignore") + BYTE_TRUNCATION_MARKER
         result[path] = text
     return result
 

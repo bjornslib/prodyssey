@@ -109,9 +109,11 @@ suggested line.
 
 ## Step 0 — Prereq gate (hard, before ANYTHING generative)
 
-Applies to **baseline** and **generate** modes. **View mode is exempt** — it
-only serves static files already on disk and has its own lightweight check
-(see View mode below); it needs neither `uv` nor `GEMINI_API_KEY`.
+Applies to **baseline** and **generate** modes. **View and Publish modes are
+exempt** — View only serves static files already on disk (needs neither `uv`
+nor `GEMINI_API_KEY`); Publish only flattens/publishes what's already
+generated (needs `uv` for its export scripts, but not `GEMINI_API_KEY`). See
+each mode's own section below.
 
 Run this before any other step, every baseline/generate invocation:
 
@@ -140,10 +142,11 @@ Only after all three checks pass does mode dispatch begin.
 
 ## Mode dispatch
 
-The invoking command passes a mode (`baseline`, `generate`, or `view`) plus
-forwarded args (`--repo`, `--store`, `--prs`, `--force`, `--voice`, `--dry-run`,
-`--port`, `--stop`, `--list`). If invoked with no mode, ask the user whether
-they want `baseline`, `generate`, or `view`.
+The invoking command passes a mode (`baseline`, `generate`, `view`, or
+`publish`) plus forwarded args (`--repo`, `--store`, `--prs`, `--force`,
+`--voice`, `--dry-run`, `--port`, `--stop`, `--list`, `--format`). If invoked
+with no mode, ask the user whether they want `baseline`, `generate`, `view`,
+or `publish`.
 
 ## Baseline mode
 
@@ -396,6 +399,67 @@ applies — see Hub resolution).
    `/prodyssey:view --repo <other>` (or answering the picker) and refreshing
    the tab, and that `/prodyssey:view --stop` shuts the server down entirely.
 
+## Publish mode
+
+Flattens already-generated PRs into self-contained Claude Artifacts — one per
+PR, plus an index artifact linking to all of them. Publish mode is a
+consumer of an existing bundle, not a generator: it needs `uv` (to run the
+export scripts) but not `GEMINI_API_KEY`, and doesn't touch `<target>` at all.
+
+1. **Resolve `<bundle-dir>`** per Hub resolution above (same `--repo`/`--store`
+   rules as every other mode — nothing new here).
+2. **Resolve `--format`** (default `artifact`). Anything other than `artifact`
+   — right now that's just `notion` — is a recognized, reserved value with no
+   implementation yet: report that clearly ("`--format notion` isn't
+   implemented yet") and STOP rather than falling through to the artifact
+   path silently.
+3. **Resolve the PR list** from `--prs` (comma list or `N..M` range, same
+   parsing as Generate mode). For each requested PR, confirm it exists in
+   `<bundle-dir>/data/story.json`'s timeline; if any don't, tell the user to
+   run `/prodyssey:generate --prs <N>` first and STOP before publishing any
+   of the others (a partial publish from a partially-valid PR list is more
+   confusing than refusing up front).
+4. **Per PR**, in order:
+   ```bash
+   uv run "${CLAUDE_PLUGIN_ROOT}/scripts/export_artifact.py" --bundle-dir <bundle-dir> --prs <N>
+   ```
+   This writes `<bundle-dir>/exports/pr-<N>.html` and updates that PR's entry
+   in `<bundle-dir>/exports/publish-manifest.json`, printing whether the
+   commit or narrative content changed since the last export. Read
+   `publish-manifest.json` after the script runs (it prints the path) to get
+   this PR's current `artifact_url` (if any):
+   - If there's no recorded `artifact_url` yet, or the script reported a
+     commit/content change, or the user passed `--force`: call the `Artifact`
+     tool on `exports/pr-<N>.html` (`title`: `"<repo> — PR #<N>: <title>"`,
+     `description`: the PR's tagline, `favicon`: an emoji fitting the PR).
+     Pass the existing `artifact_url` as `url:` when there is one, so
+     republishing updates the same link instead of minting a new one. Then
+     record the result:
+     ```bash
+     uv run "${CLAUDE_PLUGIN_ROOT}/scripts/record_publish.py" --bundle-dir <bundle-dir> --target pr-<N> --url <returned-url>
+     ```
+   - Otherwise, report "already up to date" with the existing URL and move on
+     — don't call the Artifact tool for a PR that hasn't changed.
+5. **Always rebuild and republish the index**, regardless of which PRs (if
+   any) actually changed this run — it reflects every PR ever recorded in
+   `publish-manifest.json`, not just this invocation's:
+   ```bash
+   uv run "${CLAUDE_PLUGIN_ROOT}/scripts/export_index.py" --bundle-dir <bundle-dir>
+   ```
+   Call the `Artifact` tool on the resulting `exports/index.html`, passing
+   `publish-manifest.json`'s `index.artifact_url` as `url:` when present so
+   it updates in place across sessions the same way per-PR artifacts do.
+   Record it the same way: `--target index`.
+6. **Report a summary table** — PR, status (published / updated / unchanged),
+   artifact URL — plus the index URL.
+
+If the `Artifact` tool isn't available (per Anthropic's own documentation:
+publishing artifacts requires a `/login` session on a paid plan — API-key and
+cloud-provider-credential sessions can't publish), the export files this mode
+produces are still valid deliverables — tell the user where they landed
+(`<bundle-dir>/exports/`) so they can open or share them another way instead
+of the run looking like it silently failed.
+
 ## Notes
 
 - Narrative authoring and ADR extraction are Claude judgment work — never delegate
@@ -408,3 +472,7 @@ applies — see Hub resolution).
 - View mode's PID/log files and the `active` symlink live under
   `<hub>/.prodyssey/`, never inside `<target>/.odyssey/` — that directory is the
   committable bundle when self-analysis storage applies.
+- Publish mode's `exports/` (per-PR HTML, `index.html`, `publish-manifest.json`)
+  lives inside `<bundle-dir>` and is committable the same way `data/`/`assets/`
+  are — it's the durable record of what's been published and from what
+  version, not disposable build output.
