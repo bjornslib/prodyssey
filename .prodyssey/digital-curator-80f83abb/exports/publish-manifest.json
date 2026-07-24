@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0",
+  "repo": "digital-curator",
+  "prs": {
+    "1": {
+      "title": "Extension Ux Electron Port Xaywq7",
+      "tagline": "The privacy filter leaves the browser tab and moves onto the Mac clipboard.",
+      "status": "merged",
+      "commit": null,
+      "source_hash": "6d378a9e7b306d91",
+      "export_file": "exports/pr-1.html",
+      "export_bytes": 9262131,
+      "exported_at": "2026-07-22T09:30:29Z",
+      "artifact_url": "https://claude.ai/code/artifact/95e16e1b-7320-48dd-b083-d1a2768f5ddc",
+      "published_at": "2026-07-22T09:25:12Z",
+      "date": "2026-07-16"
+    }
+  },
+  "index": {
+    "artifact_url": "https://claude.ai/code/artifact/e48bab09-9810-4771-92eb-fa4103b9d709",
+    "published_at": "2026-07-22T09:31:08Z"
+  }
+}

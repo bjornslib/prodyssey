@@ -19,8 +19,21 @@ PR discovery is a fallback chain:
   (a) merge-commit scan: `Merge pull request #N` on `git log --merges`
   (b) squash-commit scan: `(#N)` trailer on `git log --first-parent`
   (c) explicit --prs N,... resolved against (a)+(b); anything still unresolved
-      is looked up via `gh pr view N --json mergeCommit,title,mergedAt` if
-      `gh` is on PATH, else the run fails listing what was tried.
+      is looked up via `gh pr view N` if `gh` is on PATH, else the run fails
+      listing what was tried. This `gh` fallback also resolves PRs that are
+      still OPEN (no merge commit yet): the diff is taken against the local
+      merge-base of the PR's head and base branches, and the resulting
+      timeline entry is tagged `"status": "open"` instead of `"merged"`.
+      Re-running against an open PR after new commits land on its branch
+      refreshes the diff/size/touched fields to match the branch's current
+      tip — open-PR entries are not treated as immutable history the way
+      merged entries are.
+
+Every timeline entry also carries `"commit"`: the merge-commit SHA for a
+merged PR (permanent), or the branch-head SHA as of generation time for an
+open one (expected to move on later re-runs) — a stable per-PR reference
+for downstream consumers (e.g. the publish pipeline's staleness check) that
+this script already computed internally but didn't use to persist.
 
 Usage:
     uv run extract_story.py --repo <path> --dry-run
@@ -133,6 +146,8 @@ def discover_merge_prs(repo: Path, rev: str) -> list[dict]:
                 "date": commit_date,
                 "pr": pr_num,
                 "derived_title": derived_title or f"PR #{pr_num}",
+                "status": "merged",
+                "diff_base": f"{commit_hash}^1",
             }
         )
     return prs
@@ -157,14 +172,34 @@ def discover_squash_prs(repo: Path, rev: str) -> list[dict]:
                 "date": commit_date,
                 "pr": pr_num,
                 "derived_title": title or f"PR #{pr_num}",
+                "status": "merged",
+                "diff_base": f"{commit_hash}^1",
             }
         )
     return prs
 
 
+def compute_merge_base(repo: Path, base_ref: str, head_ref: str) -> str | None:
+    """Local merge-base of a PR's base branch and head commit. Falls back to
+    `origin/<base_ref>` when the bare branch name doesn't resolve locally
+    (e.g. an open PR from a fork, or a base branch not fetched under that
+    exact local name)."""
+    try:
+        return run_git(repo, ["merge-base", base_ref, head_ref]).strip()
+    except subprocess.CalledProcessError:
+        pass
+    try:
+        return run_git(repo, ["merge-base", f"origin/{base_ref}", head_ref]).strip()
+    except subprocess.CalledProcessError:
+        return None
+
+
 def try_gh_pr(repo: Path, pr_num: int) -> dict | None:
     origin = get_remote_origin(repo)
-    cmd = ["gh", "pr", "view", str(pr_num), "--json", "mergeCommit,title,mergedAt"]
+    cmd = [
+        "gh", "pr", "view", str(pr_num), "--json",
+        "mergeCommit,title,mergedAt,headRefOid,baseRefName,updatedAt",
+    ]
     if origin:
         cmd += ["--repo", origin]
     try:
@@ -175,15 +210,41 @@ def try_gh_pr(repo: Path, pr_num: int) -> dict | None:
         data = json.loads(out)
     except json.JSONDecodeError:
         return None
+
     merge_commit = (data.get("mergeCommit") or {}).get("oid")
-    if not merge_commit:
-        return None
     merged_at = data.get("mergedAt") or ""
+    title = data.get("title") or f"PR #{pr_num}"
+
+    if merge_commit:
+        return {
+            "hash": merge_commit,
+            "date": merged_at[:10] if merged_at else "",
+            "pr": pr_num,
+            "derived_title": title,
+            "status": "merged",
+            "diff_base": f"{merge_commit}^1",
+        }
+
+    if merged_at:
+        # Reported merged but no merge commit oid — unexpected shape, don't guess.
+        return None
+
+    # No merge commit and not merged: this PR is still open.
+    head_ref = data.get("headRefOid")
+    base_ref = data.get("baseRefName")
+    if not head_ref or not base_ref:
+        return None
+    merge_base = compute_merge_base(repo, base_ref, head_ref)
+    if not merge_base:
+        return None
+    updated_at = data.get("updatedAt") or ""
     return {
-        "hash": merge_commit,
-        "date": merged_at[:10] if merged_at else "",
+        "hash": head_ref,
+        "date": updated_at[:10] if updated_at else date.today().isoformat(),
         "pr": pr_num,
-        "derived_title": data.get("title") or f"PR #{pr_num}",
+        "derived_title": title,
+        "status": "open",
+        "diff_base": merge_base,
     }
 
 
@@ -250,8 +311,11 @@ def discover_prs(repo: Path, dot_range: str | None, prs_filter: list[int] | None
     return resolved
 
 
-def get_size(repo: Path, commit_hash: str) -> dict:
-    out = run_git(repo, ["diff", "--stat", f"{commit_hash}^1", commit_hash])
+def get_size(repo: Path, commit_hash: str, diff_base: str | None = None) -> dict:
+    """`diff_base` is the range's left side (defaults to `<commit_hash>^1`,
+    the merged-PR case). Open PRs pass their merge-base commit instead."""
+    base = diff_base if diff_base is not None else f"{commit_hash}^1"
+    out = run_git(repo, ["diff", "--stat", base, commit_hash])
     lines = [l for l in out.splitlines() if l.strip()]
     if not lines:
         return {"files": 0, "adds": 0, "dels": 0}
@@ -265,8 +329,10 @@ def get_size(repo: Path, commit_hash: str) -> dict:
     }
 
 
-def get_touched(repo: Path, commit_hash: str) -> dict:
-    out = run_git(repo, ["diff", "--name-only", f"{commit_hash}^1", commit_hash])
+def get_touched(repo: Path, commit_hash: str, diff_base: str | None = None) -> dict:
+    """See `get_size` for `diff_base` semantics."""
+    base = diff_base if diff_base is not None else f"{commit_hash}^1"
+    out = run_git(repo, ["diff", "--name-only", base, commit_hash])
     touched: dict[str, int] = {}
     for path in out.splitlines():
         path = path.strip()
@@ -429,8 +495,10 @@ def build_new_story(repo: Path, existing: dict, dot_range: str | None, prs_filte
     new_timeline = []
     for pr_info in prs:
         pr_num = pr_info["pr"]
-        size = get_size(repo, pr_info["hash"])
-        touched = get_touched(repo, pr_info["hash"])
+        diff_base = pr_info.get("diff_base") or f"{pr_info['hash']}^1"
+        status = pr_info.get("status", "merged")
+        size = get_size(repo, pr_info["hash"], diff_base)
+        touched = get_touched(repo, pr_info["hash"], diff_base)
 
         if pr_num in existing_by_pr:
             # Preserve every authored field; refresh only the mechanical ones.
@@ -438,6 +506,8 @@ def build_new_story(repo: Path, existing: dict, dot_range: str | None, prs_filte
             entry["date"] = pr_info["date"]
             entry["size"] = size
             entry["touched"] = touched
+            entry["status"] = status
+            entry["commit"] = pr_info["hash"]
         else:
             entry = {
                 "pr": pr_num,
@@ -448,6 +518,8 @@ def build_new_story(repo: Path, existing: dict, dot_range: str | None, prs_filte
                 "size": size,
                 "touched": touched,
                 "levels": {},
+                "status": status,
+                "commit": pr_info["hash"],
             }
         new_timeline.append(entry)
 

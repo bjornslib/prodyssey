@@ -13,6 +13,16 @@ How to write a per-PR narrative for the Odyssey bundle viewer
 `narration` and gets the plot; a developer reads `detail`/`problem`/`solution` and
 gets the mechanism.
 
+**Open PRs (`timeline[].status == "open"`).** Everything below assumes a
+merged, settled PR — write past tense, and it's safe to assert what the
+codebase now does. For an open PR, switch to present/future framing: "this PR
+proposes to," "would move," "is adding," not "moved" or "added." Don't state
+as fact anything that's only true once the PR merges (e.g. don't say a
+downstream module "now reads from X" when that's this PR's proposed change,
+not the codebase's current state). This applies to `narration`, `problem`/
+`solution`, `beats`, and `voice` alike — the register (plain vs.
+developer-precise) is unchanged, only the tense/certainty.
+
 ## 1. Framework origin
 
 The four-part structure is Geoffrey Litt's **explain-diff** framework

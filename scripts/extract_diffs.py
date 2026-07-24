@@ -5,12 +5,18 @@
 # ///
 """Extract per-PR unified diffs into <bundle-dir>/data/diffs-pr{N}.js.
 
-For each requested PR, resolves its merge/squash commit (same discovery chain
-as extract_story.py — merge-commit scan, squash-commit scan, gh CLI fallback;
-duplicated here so this script is standalone-runnable with no cross-imports),
-then computes the diff:
+For each requested PR, resolves its merge/squash commit, or — if the PR is
+still open (no merge commit yet) — its head commit and local merge-base
+(same discovery chain as extract_story.py — merge-commit scan, squash-commit
+scan, gh CLI fallback with an open-PR path; duplicated here so this script is
+standalone-runnable with no cross-imports), then computes the diff:
   - merge commit: `git diff <parent1>..<parent2>`
   - squash commit: `git diff <sha>^..<sha>`
+  - open PR:       `git diff <merge-base>..<head>`
+
+Open-PR diffs reflect the branch's current tip as of the run — re-running
+after new commits land on that branch (and passing `--force`) refreshes the
+diff rather than treating it as immutable history the way merged PRs are.
 
 The diff is split per file (on `diff --git a/... b/...` boundaries), each
 file's diff capped at 4000 lines with a truncation marker, and written as a
@@ -32,11 +38,17 @@ from pathlib import Path
 
 SCHEMA_VERSION = "1.0"
 MAX_LINES_PER_FILE = 4000
+MAX_BYTES_PER_FILE = 200_000  # belt-and-suspenders: some files (minified JS, a
+# single-line JSON blob, a data-URI-heavy HTML export) pack megabytes onto a
+# handful of lines, so the line cap alone doesn't bound them.
 TRUNCATION_MARKER = "\n… [truncated by prodyssey: diff exceeds 4000 lines]"
+BYTE_TRUNCATION_MARKER = "\n… [truncated by prodyssey: diff exceeds 200KB on very few lines]"
+GENERATED_EXPORT_NOTE = "[not diffed by prodyssey: this is a previously-published bundle export, not source — its content is a base64-heavy self-contained HTML file, and diffing it against itself on every regenerate would balloon future diffs without adding anything narratively useful]"
 
 MERGE_PR_RE = re.compile(r"Merge pull request #(\d+) from \S+?/(\S+)")
 SQUASH_PR_RE = re.compile(r"\(#(\d+)\)\s*$")
 DIFF_GIT_RE = re.compile(r"^diff --git a/(.+?) b/(.+)$")
+GENERATED_EXPORT_RE = re.compile(r"(^|/)exports/[^/]+\.html$")
 
 
 # ---- PR resolution (duplicated from extract_story.py — no cross-imports) ----
@@ -134,9 +146,27 @@ def discover_squash_prs(repo: Path, rev: str) -> list[dict]:
     return prs
 
 
+def compute_merge_base(repo: Path, base_ref: str, head_ref: str) -> str | None:
+    """Local merge-base of a PR's base branch and head commit. Falls back to
+    `origin/<base_ref>` when the bare branch name doesn't resolve locally
+    (e.g. an open PR from a fork, or a base branch not fetched under that
+    exact local name)."""
+    try:
+        return run_git(repo, ["merge-base", base_ref, head_ref]).strip()
+    except subprocess.CalledProcessError:
+        pass
+    try:
+        return run_git(repo, ["merge-base", f"origin/{base_ref}", head_ref]).strip()
+    except subprocess.CalledProcessError:
+        return None
+
+
 def try_gh_pr(repo: Path, pr_num: int) -> dict | None:
     origin = get_remote_origin(repo)
-    cmd = ["gh", "pr", "view", str(pr_num), "--json", "mergeCommit,title,mergedAt"]
+    cmd = [
+        "gh", "pr", "view", str(pr_num), "--json",
+        "mergeCommit,title,mergedAt,headRefOid,baseRefName",
+    ]
     if origin:
         cmd += ["--repo", origin]
     try:
@@ -147,10 +177,26 @@ def try_gh_pr(repo: Path, pr_num: int) -> dict | None:
         data = json.loads(out)
     except json.JSONDecodeError:
         return None
+
     merge_commit = (data.get("mergeCommit") or {}).get("oid")
-    if not merge_commit:
+    merged_at = data.get("mergedAt") or ""
+
+    if merge_commit:
+        return {"hash": merge_commit, "pr": pr_num, "kind": commit_kind(repo, merge_commit)}
+
+    if merged_at:
+        # Reported merged but no merge commit oid — unexpected shape, don't guess.
         return None
-    return {"hash": merge_commit, "pr": pr_num, "kind": commit_kind(repo, merge_commit)}
+
+    # No merge commit and not merged: this PR is still open.
+    head_ref = data.get("headRefOid")
+    base_ref = data.get("baseRefName")
+    if not head_ref or not base_ref:
+        return None
+    merge_base = compute_merge_base(repo, base_ref, head_ref)
+    if not merge_base:
+        return None
+    return {"hash": head_ref, "pr": pr_num, "kind": "open", "diff_base": merge_base}
 
 
 def resolve_prs(repo: Path, pr_nums: list[int], dot_range: str | None) -> dict[int, dict]:
@@ -208,6 +254,8 @@ def get_diff_text(repo: Path, entry: dict) -> str:
         parts = run_git(repo, ["rev-list", "--parents", "-n", "1", sha]).strip().split()
         parent1, parent2 = parts[1], parts[2]
         return run_git(repo, ["diff", f"{parent1}..{parent2}"])
+    if entry["kind"] == "open":
+        return run_git(repo, ["diff", f"{entry['diff_base']}..{sha}"])
     return run_git(repo, ["diff", f"{sha}^..{sha}"])
 
 
@@ -229,10 +277,19 @@ def split_diff_by_file(diff_text: str) -> dict[str, str]:
 
     result = {}
     for path, file_lines in files.items():
+        if GENERATED_EXPORT_RE.search(path):
+            result[path] = file_lines[0] + "\n" + GENERATED_EXPORT_NOTE
+            continue
         if len(file_lines) > MAX_LINES_PER_FILE:
             text = "\n".join(file_lines[:MAX_LINES_PER_FILE]) + TRUNCATION_MARKER
         else:
             text = "\n".join(file_lines)
+        if len(text.encode()) > MAX_BYTES_PER_FILE:
+            # Truncate on a character boundary near the byte cap, not a line
+            # boundary — a single oversized line is exactly the case this
+            # guards against.
+            encoded = text.encode()[:MAX_BYTES_PER_FILE]
+            text = encoded.decode(errors="ignore") + BYTE_TRUNCATION_MARKER
         result[path] = text
     return result
 

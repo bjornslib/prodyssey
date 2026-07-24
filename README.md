@@ -113,6 +113,7 @@ repo you're already in) everything lands in `.odyssey/` in that repo — a
   assets/pr-{N}/level-{1..3}.png
   inventory.yaml
   viewer/index.html
+  exports/{publish-manifest.json, pr-{N}.html…, index.html}   # written by /prodyssey:publish
 ```
 
 Commit it, and a share link is just the raw GitHub URL; or import it into the
@@ -130,22 +131,27 @@ prodyssey/
 │   └── marketplace.json      # one-plugin marketplace: name "prodyssey", plugins: [{source: "."}]
 ├── commands/
 │   ├── baseline.md           # thin: invokes the skill with args="baseline"
-│   └── generate.md           # thin: invokes the skill with args="generate --prs ..."
+│   ├── generate.md           # thin: invokes the skill with args="generate --prs ..."
+│   ├── view.md                # thin: invokes the skill with args="view ..."
+│   └── publish.md             # thin: invokes the skill with args="publish --prs ..."
 ├── skills/
 │   └── odyssey/
-│       ├── SKILL.md          # orchestration: prereq gate → baseline → per-PR sweep → bundle verify
-│       ├── references/       # extracted from architecture-review-design-maintenance (see below)
-│       │   ├── story-mode.md
-│       │   ├── decision-records-lite.md
-│       │   ├── baseline-derivation.md      # describe-lite: district + inventory procedure
-│       │   ├── adr-template.md
-│       │   └── stacks/{README,nextjs,react-typescript,python-fastapi,generic}.md
-│       └── scripts/
-│           ├── extract_story.py            # generalized: any repo path, writes .odyssey/story.json
-│           ├── generate_prompts.py         # nanobanana scene-art prompts
-│           ├── generate_audio.py           # TTS narration (Gemini voices)
-│           ├── extract_diffs.py            # per-PR diff extraction into the bundle
-│           └── verify_bundle.py            # schema_version + completeness check (drives resumability)
+│       ├── SKILL.md          # orchestration: prereq gate → baseline → per-PR sweep → view → publish → verify
+│       └── references/       # extracted from architecture-review-design-maintenance (see below)
+│           ├── story-mode.md
+│           ├── decision-records-lite.md
+│           ├── baseline-derivation.md      # describe-lite: district + inventory procedure
+│           ├── adr-template.md
+│           └── stacks/{README,nextjs,react-typescript,python-fastapi,generic}.md
+├── scripts/                   # top-level, not nested under skills/ — called via ${CLAUDE_PLUGIN_ROOT}/scripts/...
+│   ├── extract_story.py       # generalized: any repo path, writes <bundle-dir>/story.json
+│   ├── generate_prompts.py    # nanobanana scene-art prompts
+│   ├── generate_audio.py      # TTS narration (Gemini voices)
+│   ├── extract_diffs.py       # per-PR diff extraction into the bundle
+│   ├── verify_bundle.py       # schema_version + completeness check (drives resumability)
+│   ├── export_artifact.py     # flattens one PR into a self-contained artifact-safe HTML
+│   ├── export_index.py        # renders the cross-PR index artifact from publish-manifest.json
+│   └── record_publish.py      # records a published Artifact URL back into publish-manifest.json
 ├── viewer/
 │   └── index.html            # portable bundle viewer
 └── README.md                 # this file
@@ -198,7 +204,7 @@ below refer to the `cobuilder-harness` repo this plugin was extracted from:
 | **describe-mode full canvas** | The flat inventory is the `maps_to` anchor; the canvas is documentation-program overhead a foreign repo can't sustain |
 | `sync-books.sh`, `sync-corpus.sh`, `html_to_pdf.py` | Corpus maintenance tooling for the parent skill |
 
-Net: the plugin ships **~15 files of prose + 5 scripts** instead of the parent
+Net: the plugin ships **~15 files of prose + 8 scripts** instead of the parent
 skill's ~200 — everything judgment-shaped travels as prompts, everything
 mechanical travels as scripts, and nothing that presumes you *maintain* the
 target repo travels at all.
@@ -221,6 +227,31 @@ target repo travels at all.
 - **Production app** (future): sign in → *Import bundle* → upload `.odyssey/`
   or paste the raw GitHub URL of a committed bundle. Review workflow (approve /
   request changes / per-level comments) works on imported stories.
+
+## Publishing the result
+
+```
+/prodyssey:publish --prs 73
+```
+
+Flattens PR #73 into a single self-contained HTML file — story, ADRs, diff,
+and scene art/narration inlined and recompressed to fit under Claude
+Artifacts' 16 MiB cap — and publishes it as an Artifact, printing the URL.
+Also rebuilds and publishes a small index artifact linking to every PR
+published so far for this bundle (not just the one(s) in this run), so it
+always reflects the full set. Re-running for a PR that hasn't changed since
+its last publish reports "already up to date" instead of re-publishing;
+`--force` overrides.
+
+```
+/prodyssey:publish --prs 73,75
+/prodyssey:publish --prs 73 --force
+```
+
+`--format artifact` is the default and only implemented target;
+`--format notion` is reserved for later. Needs the `Artifact` tool (a
+`/login` session on a paid plan) — without it, the flattened files are still
+written to `<bundle-dir>/exports/` for manual use.
 
 ## Multiple repos
 
