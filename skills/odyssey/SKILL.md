@@ -9,7 +9,7 @@ description: >
   architecture decision records for any locally checked-out git repo. Also serves the
   bundle locally for viewing. Use when the user asks to "generate codebase odyssey",
   "generate story for PR", "odyssey baseline", "prodyssey", "narrated PR story", "tell
-  the story of this PR as scene art", "explain this PR as a story", "build the .odyssey
+  the story of this PR as scene art", "explain this PR as a story", "build the odyssey
   bundle", "refresh odyssey baseline", "view the odyssey bundle", "serve the bundle",
   "open the viewer", "start the odyssey server", "stop the odyssey server", or invokes
   `/prodyssey:baseline`, `/prodyssey:generate`, or `/prodyssey:view`.
@@ -17,10 +17,17 @@ description: >
 
 # Codebase Odyssey Generator
 
-Orchestration procedure for turning merged PRs of a target repo into a portable
-`.odyssey/` bundle: four-level narrated story, scene art, TTS narration, and ADR
-retro-extraction. This is a read-only, generate-only instrument against a foreign
-repo — it never edits the target repo's source, only writes into `.odyssey/`.
+Orchestration procedure for turning merged PRs of **any locally checked-out git
+repo** — the session's own repo, or any other checkout reached via `--repo` — into
+a portable bundle: four-level narrated story, scene art, TTS narration, and ADR
+retro-extraction. This is a read-only, generate-only instrument against the target
+repo — it never edits the target repo's source, only writes into its bundle
+directory (`<bundle-dir>`, see Hub resolution below).
+
+Where that bundle actually lands depends on whether the target is the session's
+own repo or a foreign one: self-analysis bundles stay at `<target>/.odyssey/`,
+foreign-repo bundles are stored centrally at `<hub>/.prodyssey/<repo-slug>/`. See
+Hub resolution below for the exact rule.
 
 Reference material lives in `references/` and is loaded on demand, not inlined here.
 Scripts live in `scripts/` and are called via `uv run`, never edited by the skill.
@@ -196,7 +203,7 @@ Per-PR narrative + ADR + art + audio sweep. Steps:
    original snapshot as immutable the way a merged PR's is.
 
 
-3. **Per PR**, run the resumability check first and only execute stages whose
+3. **Per PR**, run the resumability check first and only execute stages which
    artifacts are missing (or all stages if `--force`):
    ```bash
    uv run "${CLAUDE_PLUGIN_ROOT}/scripts/verify_bundle.py" --bundle-dir <bundle-dir> --prs <N> --json
@@ -255,8 +262,8 @@ viewed is just repointing a symlink; it never requires restarting the server.
 404s on every one of those requests. The server must be rooted at the bundle
 ROOT (parent of `viewer/` and `data/`), and the reported/requested URL must
 include the `/viewer/` path segment. (Confirmed via curl this session: 404
-from `.odyssey/viewer/` root; 200 once served from `.odyssey/` — the bundle
-root — with `/viewer/index.html` requested.) `python3 -m http.server` also
+from `<bundle-dir>/viewer/` root; 200 once served from `<bundle-dir>` — the
+bundle root — with `/viewer/index.html` requested.) `python3 -m http.server` also
 correctly follows symlinks — both the symlink itself and the relative
 `../data/...` requests made through pages served via the symlink resolve
 correctly (confirmed via curl this session) — which is what makes the

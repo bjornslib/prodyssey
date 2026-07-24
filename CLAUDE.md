@@ -6,9 +6,17 @@ Guidance for Claude Code instances working in this repo.
 
 **prodyssey** is a Claude Code plugin (`.claude-plugin/`), not an app with a
 build/test/deploy cycle. It has one job: turn merged PRs of *any* locally
-checked-out git repo into a four-level narrated "codebase odyssey" — scene
-art, voice narration, retro-extracted ADRs — written into that target repo's
-`.odyssey/` bundle, viewable in a portable HTML viewer.
+checked-out git repo — the session's own repo, or any other checkout reached
+via `--repo` — into a four-level narrated "codebase odyssey" — scene art,
+voice narration, retro-extracted ADRs — viewable in a portable HTML viewer.
+
+Where the bundle lands depends on the target: analyzing your own repo
+(no `--repo`, or `--repo` resolving to the session's own checkout) writes to
+`<target>/.odyssey/`; analyzing a foreign repo writes instead to
+`<hub>/.prodyssey/<repo-slug>/`, where `<hub>` is the session's own repo —
+never the foreign one. `--store local|central` overrides the automatic
+choice. See `skills/odyssey/SKILL.md`'s Hub resolution section for the exact
+rule and slug derivation.
 
 Install surface: `/plugin marketplace add bjornslib/prodyssey` then
 `/plugin install prodyssey@prodyssey`. No agents, no hooks, no MCP servers —
@@ -24,7 +32,7 @@ know that aren't obvious from reading the files.
 
 ```
 .claude-plugin/       plugin.json (manifest) + marketplace.json
-commands/              thin dispatchers: baseline.md, generate.md → Skill("odyssey", args=...)
+commands/              thin dispatchers: baseline.md, generate.md, view.md → Skill("odyssey", args=...)
 skills/odyssey/
   SKILL.md            orchestration: prereq gate → baseline → per-PR sweep → verify
   references/         loaded on demand (story-mode, decision-records-lite,
@@ -106,7 +114,7 @@ per the transform above.
 ## Bundle output shape (what generation produces)
 
 ```
-<target>/.odyssey/
+<bundle-dir>/       <target>/.odyssey/ for self-analysis, <hub>/.prodyssey/<repo-slug>/ for a foreign repo
   data/{story.json, story.js, adrs.json, adrs.js, manifest.js,
         diffs-pr{N}.js…, audio/pr{N}_{level}.wav}
   assets/pr-{N}/level-{1..3}.png
@@ -115,21 +123,32 @@ per the transform above.
 ```
 
 `story.json`'s `meta.schema_version` is currently `"1.0"` —
-`verify_bundle.py` gates on it (`SCHEMA_VERSION_KNOWN`). `.odyssey/` is
-committed in *this* repo (not gitignored) — the team deliberately tracks
-prodyssey's own generated bundles so engineers can review each other's PRs
-as an odyssey instead of only a raw diff, same as it's meant to be committed
-in target repos that adopt the plugin.
+`verify_bundle.py` gates on it (`SCHEMA_VERSION_KNOWN`). Both `.odyssey/` and
+`.prodyssey/` are committed in *this* repo (not gitignored — `.odyssey/` was
+explicitly un-ignored in `66782c7`, and `.prodyssey/` was never ignored):
+`.odyssey/` is this repo's own generated bundle, tracked so engineers can
+review each other's PRs as an odyssey instead of only a raw diff, same as
+it's meant to be committed in target repos that adopt the plugin;
+`.prodyssey/` holds committed *test fixtures* — bundles generated against
+other local repos (`cobuilder-harness-a103a550`, `digital-curator-80f83abb`)
+via `--repo`, kept as demo/dogfooding data rather than as this repo's own PR
+history. A hub adopting the plugin for its own use is not expected to commit
+`.prodyssey/` the same way — `skills/odyssey/SKILL.md`'s Hub resolution
+section has the skill suggest a `.gitignore` line for it by default.
 
 ## Conventions worth preserving
 
 - Never touch anything in `<target>` outside `<target>/.odyssey/` and a
-  read-only check of `<target>/.env`.
+  read-only check of `<target>/.env`; `<hub>/.prodyssey/` is also a
+  sanctioned write location, for centrally-stored foreign-repo bundles and
+  view-server bookkeeping.
 - `extract_story.py` never overwrites authored narrative fields for PRs
   already in `story.json` — new PRs get a minimal stub; re-running is safe.
-- `--repo <path>` (skill + both commands) targets any local checkout, not
-  just the session's own working directory; the bundle always lands at
-  `<target>/.odyssey/` regardless of where the session is running.
+- `--repo <path>` (skill + all three commands) targets any local checkout,
+  not just the session's own working directory; where the bundle lands is
+  the Hub resolution storage rule — `<target>/.odyssey/` for self-analysis,
+  `<hub>/.prodyssey/<repo-slug>/` for a foreign repo, overridable with
+  `--store local|central`.
 - Everything judgment-shaped (narrative voice, register, what counts as a
   decision worth an ADR) lives in `references/*.md` prose, loaded on demand
   — not hardcoded in scripts or the skill body.
@@ -137,6 +156,7 @@ in target repos that adopt the plugin.
 ## Recent history
 
 Plugin scaffold → viewer port → skill/references/commands → generation +
-verification scripts → `--repo` external-checkout targeting (see `git log`
-for the WS-A/B/C/D workstream commits). No test suite, no CI config, no
-package manager — this is prose + Python scripts + one HTML file.
+verification scripts → `--repo` external-checkout targeting → Hub
+resolution / central storage (`--store`, `.prodyssey/`, `view` command) (see
+`git log` for the WS-A/B/C/D workstream commits). No test suite, no CI
+config, no package manager — this is prose + Python scripts + one HTML file.
